@@ -1,0 +1,14 @@
+{
+  "name": "spirit-wallet-bot-monorepo",
+  "version": "0.0.1",
+  "description": "",
+  "author": "",
+  "private": true,
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "yarn workspaces run build"
+  }
+}
