@@ -3,48 +3,97 @@
 import configuration from '@app/shared/configuration';
 import { Injectable } from '@nestjs/common';
 import TelegramBot from 'node-telegram-bot-api';
-import { HDNodeWallet } from 'ethers';
-import { computeAddressFromMnemonic, getStarkPk } from './utils';
-import { ACCOUNT_CLASS_HASH } from '@app/shared/constants';
 import { formattedContractAddress } from '@app/shared/utils';
+import { generateSeedPhrase, getWalletAddress, isValidPassword } from './utils';
+import {
+  sendInvalidPasswordMessage,
+  sendNewWalletMessage,
+  sendStartMessage,
+} from './messages';
+import { RedisService } from '../redis/redis.service';
+import { BotCommand, UserState } from '@app/shared/types';
 
 @Injectable()
 export class BotService {
-  bot: TelegramBot = new TelegramBot(configuration().TELEGRAM_BOT_TOKEN, {
-    polling: true,
-  });
-  constructor() {
-    this.start();
+  private bot: TelegramBot;
+
+  constructor(private readonly redisService: RedisService) {
+    this.bot = new TelegramBot(configuration().TELEGRAM_BOT_TOKEN, {
+      polling: true,
+    });
+    this.listenOnMessage();
   }
 
-  start() {
-    this.bot.on('message', (msg) => {
-      if (msg.text === '/start') {
-        this.bot.sendMessage(
-          msg.chat.id,
-          `Welcome @${msg.from.username} to Spirit Wallet, your trusted blockchain wallet for managing your digital assets on the Starknet network! 🎉\n\nWith Spirit Wallet, you can seamlessly manage your ERC-20, ERC-721, and ERC-1155 tokens all in one place. Whether you're sending, receiving, or securely storing your assets, our wallet ensures you have complete control over your digital portfolio.\n\nStart exploring the decentralized world with Spirit Wallet now by typing /newwallet! 🚀\n\nIf you need any help, just type /help to get started.`,
-        );
+  listenOnMessage() {
+    // handle '/start' command
+    this.bot.onText(/\/start/, (msg) => {
+      sendStartMessage(this.bot, msg);
+    });
+
+    // handle '/newwallet' command
+    this.bot.onText(/\/newwallet/, async (msg) => {
+      await this.handleAskPasswordCommand(msg);
+    });
+
+    this.bot.on('message', async (msg) => {
+      const chatId = msg.chat.id;
+      const message = msg.text;
+
+      // if answer of the await password question?
+      const state = await this.redisService.get(`user:${chatId}:state`);
+
+      if (
+        Object.values(BotCommand)
+          .map((command) => command.toLowerCase())
+          .includes(message.toLowerCase())
+      ) {
+        return;
       }
 
-      if (msg.text === '/newwallet') {
-        const seedPhrase = this.generateSeedPhrase();
-        const address = this.getWalletAddress(seedPhrase, 0);
+      if (state === UserState.AwaitingPassword) {
+        // if user entered a password
+        console.log(message);
 
-        this.bot.sendMessage(
-          msg.chat.id,
-          `Your seed phrase is:\n\n${'`'}${seedPhrase}${'`'}\n\nPlease keep it safe and secure. Don't share it with anyone. If you lose it, you will lose access to your wallet and all your assets.\n\nHere is your wallet address ${'`'}${formattedContractAddress(address)}${'`'}.\n\nWe hope you enjoy using Spirit Wallet! 💖`,
-          { parse_mode: 'Markdown' },
-        );
+        if (message) {
+          // check if the password is valid
+          if (!isValidPassword(message)) {
+            // send a message to the user
+            sendInvalidPasswordMessage(this.bot, msg);
+            return;
+          }
+
+          // delete the state
+          await this.redisService.del(`user:${chatId}:state`);
+          // delete user's password message
+          await this.bot.deleteMessage(msg.chat.id, msg.message_id);
+          // send a message to the user
+          this.handleNewWalletCommand(msg);
+        }
       }
     });
+
+    this.bot.on('polling_error', console.log);
+
+    this.bot.on('callback_query', async (callbackQuery) => {});
   }
 
-  private generateSeedPhrase(): string {
-    const mnemonic = HDNodeWallet.createRandom().mnemonic.phrase;
-    return mnemonic;
+  private async handleAskPasswordCommand(msg: TelegramBot.Message) {
+    this.bot.sendMessage(
+      msg.chat.id,
+      'Please provide a password to secure your wallet:',
+    );
+
+    // store user's state in redis
+    await this.redisService.set(
+      `user:${msg.from.id}:state`,
+      UserState.AwaitingPassword,
+    );
   }
 
-  private getWalletAddress(seedPhrase: string, index: number): string {
-    return computeAddressFromMnemonic(seedPhrase, ACCOUNT_CLASS_HASH, index);
+  private async handleNewWalletCommand(msg: TelegramBot.Message) {
+    const seedPhrase = generateSeedPhrase();
+    const address = getWalletAddress(seedPhrase, 0);
+
+    sendNewWalletMessage(this.bot, msg, seedPhrase, address);
   }
 }

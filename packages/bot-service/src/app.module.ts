@@ -5,6 +5,7 @@ import { AppLoggerMiddleware } from '@app/shared/middlewares/app-logger.middlewa
 import configuration from '@app/shared/configuration';
 import { ConfigModule } from '@nestjs/config';
 import { BotService } from './bot/bot.service';
+import { RedisService } from './redis/redis.service';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { BotService } from './bot/bot.service';
     }),
   ],
   controllers: [],
-  providers: [BotService],
+  providers: [BotService, RedisService],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer): void {
