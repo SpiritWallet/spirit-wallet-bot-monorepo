@@ -1,27 +1,18 @@
 // SPDX-License-Identifier: MIT
 
-import { ApiProperty } from '@nestjs/swagger';
-
 export class PaginationDto<T> {
-  @ApiProperty()
   public total: number;
 
-  @ApiProperty()
   public page: number;
 
-  @ApiProperty()
   public size: number;
 
-  @ApiProperty()
   public pages: number;
 
-  @ApiProperty()
   public hasNext: boolean;
 
-  @ApiProperty()
   public hasPrevious: boolean;
 
-  @ApiProperty()
   public items: T[];
 
   public constructor(...args: any[]) {

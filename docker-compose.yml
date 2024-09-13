@@ -1,0 +1,31 @@
+version: '3.8'
+
+volumes:
+  node_modules: {}
+  mongo_data: {}
+  mongo_log: {}
+
+networks:
+  app-network:
+    driver: bridge
+
+services:
+  bot-service:
+    container_name: spirit-wallet
+    build:
+      context: .
+      args:
+        PKG: 'bot-service'
+      dockerfile: Dockerfile
+
+    networks:
+      - app-network
+    secrets:
+      - telegram_bot_token
+    ports:
+      - '5001:5001'
+    user: '1000:1000'
+
+secrets:
+  telegram_bot_token:
+    file: ./secrets/TELEGRAM_BOT_TOKEN.txt

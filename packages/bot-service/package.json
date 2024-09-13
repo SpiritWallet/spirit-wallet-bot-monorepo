@@ -41,7 +41,7 @@
     "testEnvironment": "node",
     "moduleNameMapper": {
       "^@app/shared(|/.*)$": "<rootDir>/../../packages/shared/$1",
-      "^@app/web3-service(|/.*)$": "<rootDir>/../../packages/web3-service/$1"
+      "^@app/web3(|/.*)$": "<rootDir>/../../packages/web3/$1"
     }
   }
 }
