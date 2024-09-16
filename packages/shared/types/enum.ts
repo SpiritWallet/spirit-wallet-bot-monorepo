@@ -3,6 +3,7 @@
 export enum BotCommand {
   Start = '/start',
   NewWallet = '/newwallet',
+  MyWallets = '/mywallets',
   Help = '/help',
 }
 

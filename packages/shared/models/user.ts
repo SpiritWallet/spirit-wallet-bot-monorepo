@@ -19,7 +19,13 @@ export class Users extends BaseModel {
   seedPhrase: string; // encrypted
 
   @Prop()
-  password: string; // encrypted
+  iv: string;
+
+  @Prop()
+  salt: string;
+
+  @Prop()
+  password: string; // hashed
 }
 
 export const UserSchema = SchemaFactory.createForClass(Users);

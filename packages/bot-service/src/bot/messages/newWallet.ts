@@ -41,3 +41,14 @@ export function sendInvalidPasswordMessage(
     parse_mode: 'Markdown',
   });
 }
+
+export function sendAlreadyCreatedWalletMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+) {
+  const message = `You already have a wallet!`;
+
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
+  });
+}

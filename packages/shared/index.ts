@@ -3,7 +3,7 @@
 export * from './configuration';
 export * from './config';
 export * from './types';
-export * from './models';
+export * as models from './models';
 
 export async function retryUntil<T>(
   operation: () => Promise<T>,

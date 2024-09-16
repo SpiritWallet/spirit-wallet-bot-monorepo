@@ -3,21 +3,43 @@
 import configuration from '@app/shared/configuration';
 import { Injectable } from '@nestjs/common';
 import TelegramBot from 'node-telegram-bot-api';
-import { formattedContractAddress } from '@app/shared/utils';
-import { generateSeedPhrase, getWalletAddress, isValidPassword } from './utils';
 import {
+  encryptSeedPhrase,
+  generateSeedPhrase,
+  getWalletAddress,
+  hashPassword,
+  isValidPassword,
+} from './utils';
+import {
+  sendAlreadyCreatedWalletMessage,
   sendInvalidPasswordMessage,
   sendNewWalletMessage,
   sendStartMessage,
 } from './messages';
 import { RedisService } from '../redis/redis.service';
 import { BotCommand, UserState } from '@app/shared/types';
+import {
+  ChainDocument,
+  Chains,
+  UserDocument,
+  Users,
+  WalletDocument,
+  Wallets,
+} from '@app/shared/models';
+import { Model } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
 
 @Injectable()
 export class BotService {
   private bot: TelegramBot;
 
-  constructor(private readonly redisService: RedisService) {
+  constructor(
+    @InjectModel(Users.name) private readonly userModel: Model<UserDocument>,
+    @InjectModel(Chains.name) private readonly chainModel: Model<ChainDocument>,
+    @InjectModel(Wallets.name)
+    private readonly walletModel: Model<WalletDocument>,
+    private readonly redisService: RedisService,
+  ) {
     this.bot = new TelegramBot(configuration().TELEGRAM_BOT_TOKEN, {
       polling: true,
     });
@@ -76,6 +98,13 @@ export class BotService {
   }
 
   private async handleAskPasswordCommand(msg: TelegramBot.Message) {
+    // check if the user has already created a wallet
+    const user = await this.userModel.findOne({ chatId: msg.chat.id });
+    if (user) {
+      sendAlreadyCreatedWalletMessage(this.bot, msg);
+      return;
+    }
+
     this.bot.sendMessage(
       msg.chat.id,
       'Please provide a password to secure your wallet:',
@@ -92,8 +121,38 @@ export class BotService {
     const seedPhrase = generateSeedPhrase();
     const address = getWalletAddress(seedPhrase, 0);
 
-    // TODO: enscrypt the seed phrase and save it in db
+    // encrypt the seed phrase
+    const password = msg.text;
+    const { encryptedSeedPhrase, iv, salt } = await encryptSeedPhrase(
+      seedPhrase,
+      password,
+    );
 
+    // hash the user's password
+    const hashedPassword = await hashPassword(password);
+
+    // create new user entity and save in db
+    const chainDocument = await this.chainModel.findOne();
+    const newUser: Users = {
+      chatId: msg.chat.id,
+      chain: chainDocument,
+      seedPhrase: encryptedSeedPhrase,
+      iv,
+      salt,
+      password: hashedPassword,
+    };
+
+    const newUserDocument = await this.userModel.create(newUser);
+
+    // create new parrent wallet
+    const parentWallet: Wallets = {
+      chatId: newUserDocument,
+      address: address,
+      index: 0,
+      chain: chainDocument,
+      isDeployed: false,
+    };
+    await this.walletModel.create(parentWallet);
     sendNewWalletMessage(this.bot, msg, seedPhrase, address);
   }
 }
