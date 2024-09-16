@@ -7,3 +7,5 @@ export enum COMMON_CONTRACT_ADDRESS {
 
 export const ACCOUNT_CLASS_HASH =
   '0x0759483fd126c2bf189c1abad968f0a41acd89224fed0082c080dfdfdfac8008';
+
+export const SALT_ROUND = 10;
