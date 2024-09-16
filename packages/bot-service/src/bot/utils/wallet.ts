@@ -4,12 +4,17 @@ import { ethers, HDNodeWallet } from 'ethers';
 import { grindKey, getStarkKey } from '@scure/starknet';
 import { hash } from 'starknet';
 import { ACCOUNT_CLASS_HASH } from '@app/shared/constants';
+import configuration from '@app/shared/configuration';
 
 export const baseDerivationPath = "m/44'/9004'/0'/0";
 
 export function getStarkPk(mnemonic: string, index: number) {
   const fullPath = getPathForIndex(index, baseDerivationPath);
-  const masterNode = ethers.HDNodeWallet.fromPhrase(mnemonic, '', fullPath);
+  const masterNode = ethers.HDNodeWallet.fromPhrase(
+    mnemonic,
+    configuration().PHRASE_TO_PK_PWD,
+    fullPath,
+  );
   const groundKey = grindKey(masterNode.privateKey);
   return getStarkKey(groundKey);
 }
@@ -36,7 +41,7 @@ export function computeAddressFromPk(pk: string, accountClassHash: string) {
   return hash.calculateContractAddressFromHash(
     starkKeyPub,
     BigInt(accountClassHash),
-    [starkKeyPub, '0'],
+    [starkKeyPub],
     0,
   );
 }

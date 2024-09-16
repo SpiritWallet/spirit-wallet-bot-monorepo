@@ -10,6 +10,20 @@ networks:
     driver: bridge
 
 services:
+  mongo:
+    image: mongo:7.0.14
+    networks:
+      - app-network
+    restart: always
+    environment:
+      - HOST=mongo
+    volumes:
+      - mongo_data:/data/db
+      - mongo_log:/data/log
+    ports:
+      - 127.0.0.1:27018:27017
+    user: '1000:1000'
+
   bot-service:
     container_name: spirit-wallet
     build:
@@ -22,6 +36,10 @@ services:
       - app-network
     secrets:
       - telegram_bot_token
+      - db_path
+    restart: always
+    depends_on:
+      - mongo
     ports:
       - '5001:5001'
     user: '1000:1000'
@@ -29,3 +47,5 @@ services:
 secrets:
   telegram_bot_token:
     file: ./secrets/TELEGRAM_BOT_TOKEN.txt
+  db_path:
+    file: ./secrets/DB_PATH.txt

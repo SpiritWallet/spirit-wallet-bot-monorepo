@@ -4,8 +4,8 @@ import { Module, MiddlewareConsumer } from '@nestjs/common';
 import { AppLoggerMiddleware } from '@app/shared/middlewares/app-logger.middleware';
 import configuration from '@app/shared/configuration';
 import { ConfigModule } from '@nestjs/config';
-import { BotService } from './bot/bot.service';
-import { RedisService } from './redis/redis.service';
+import { MongooseModule } from '@nestjs/mongoose';
+import { BotModule } from './bot/bot.module';
 
 @Module({
   imports: [
@@ -13,9 +13,11 @@ import { RedisService } from './redis/redis.service';
       isGlobal: true,
       load: [configuration],
     }),
+    MongooseModule.forRoot(configuration().DB_PATH),
+    BotModule,
   ],
   controllers: [],
-  providers: [BotService, RedisService],
+  providers: [],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer): void {

@@ -52,8 +52,6 @@ export class BotService {
 
       if (state === UserState.AwaitingPassword) {
         // if user entered a password
-        console.log(message);
-
         if (message) {
           // check if the password is valid
           if (!isValidPassword(message)) {
@@ -93,6 +91,8 @@ export class BotService {
   private async handleNewWalletCommand(msg: TelegramBot.Message) {
     const seedPhrase = generateSeedPhrase();
     const address = getWalletAddress(seedPhrase, 0);
+
+    // TODO: enscrypt the seed phrase and save it in db
 
     sendNewWalletMessage(this.bot, msg, seedPhrase, address);
   }
