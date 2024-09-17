@@ -4,6 +4,7 @@ import configuration from '@app/shared/configuration';
 import { Injectable } from '@nestjs/common';
 import TelegramBot from 'node-telegram-bot-api';
 import {
+  decodeAddress,
   encryptSeedPhrase,
   generateSeedPhrase,
   getWalletAddress,
@@ -11,16 +12,24 @@ import {
   isValidPassword,
 } from './utils';
 import {
+  classifyWalletFunction,
   sendAlreadyCreatedWalletMessage,
   sendInvalidPasswordMessage,
   sendNewWalletMessage,
+  sendNoWalletMessage,
+  sendPortfolioMessage,
   sendStartMessage,
-} from './messages';
+  sendWalletFunctionMessage,
+  sendWalletListMessage,
+} from './utils/messages';
 import { RedisService } from '../redis/redis.service';
 import { BotCommand, UserState } from '@app/shared/types';
 import {
   ChainDocument,
   Chains,
+  Erc20BalanceDocument,
+  Erc20Balances,
+  NftBalanceDocument,
   UserDocument,
   Users,
   WalletDocument,
@@ -28,6 +37,15 @@ import {
 } from '@app/shared/models';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
+import {
+  COMMAND_CALLBACK_DATA_PREFIXS,
+  COMMON_CONTRACT_ADDRESS,
+  PORTFOLIO_CALLBACK_DATA_PREFIXS,
+  SPECIAL_PREFIXS,
+  TURN_BACK_CALLBACK_DATA_KEYS,
+} from '@app/shared/constants';
+import { PortfolioService } from '../portfolio/portfolio.service';
+import { Erc20BalancesDto } from '@app/shared/dto';
 
 @Injectable()
 export class BotService {
@@ -38,7 +56,10 @@ export class BotService {
     @InjectModel(Chains.name) private readonly chainModel: Model<ChainDocument>,
     @InjectModel(Wallets.name)
     private readonly walletModel: Model<WalletDocument>,
+    @InjectModel(Erc20Balances.name)
+    private readonly erc20BalanceModel: Model<Erc20BalanceDocument>,
     private readonly redisService: RedisService,
+    private readonly portfolioService: PortfolioService,
   ) {
     this.bot = new TelegramBot(configuration().TELEGRAM_BOT_TOKEN, {
       polling: true,
@@ -55,6 +76,11 @@ export class BotService {
     // handle '/newwallet' command
     this.bot.onText(/\/newwallet/, async (msg) => {
       await this.handleAskPasswordCommand(msg);
+    });
+
+    // handle '/mywallets' command
+    this.bot.onText(/\/mywallets/, async (msg) => {
+      await this.handleManageWalletsCommand(msg);
     });
 
     this.bot.on('message', async (msg) => {
@@ -94,7 +120,47 @@ export class BotService {
 
     this.bot.on('polling_error', console.log);
 
-    this.bot.on('callback_query', async (callbackQuery) => {});
+    this.bot.on('callback_query', async (callbackQuery) => {
+      const data = callbackQuery.data;
+
+      // send wallet's functions message
+      if (
+        data.startsWith(COMMAND_CALLBACK_DATA_PREFIXS.MY_WALLETS) ||
+        data.startsWith(TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLET_FUNCTIONS)
+      ) {
+        sendWalletFunctionMessage(this.bot, callbackQuery);
+      }
+
+      // send message of specific function
+      if (data.startsWith(SPECIAL_PREFIXS.FUNCTION)) {
+        classifyWalletFunction(this.bot, callbackQuery);
+      }
+
+      // execute portfolio function
+      if (data.startsWith(SPECIAL_PREFIXS.PORTFOLIO)) {
+        const [fnPrefix, functionName, encodedAddress] = data.split('_');
+        const combinedPrefix = fnPrefix + '_' + functionName + '_';
+
+        let balances: Erc20BalancesDto[] = [];
+        switch (combinedPrefix) {
+          case PORTFOLIO_CALLBACK_DATA_PREFIXS.ERC20_TOKENS:
+            balances = await this.portfolioService.getWalletErc20Balances(
+              decodeAddress(encodedAddress),
+            );
+            break;
+          case PORTFOLIO_CALLBACK_DATA_PREFIXS.NFT:
+            break;
+        }
+        await sendPortfolioMessage(this.bot, callbackQuery, balances);
+      }
+
+      if (data === TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLETS) {
+        await this.handleManageWalletsCommand(
+          callbackQuery.message,
+          callbackQuery.message.message_id,
+        );
+      }
+    });
   }
 
   private async handleAskPasswordCommand(msg: TelegramBot.Message) {
@@ -152,7 +218,46 @@ export class BotService {
       chain: chainDocument,
       isDeployed: false,
     };
-    await this.walletModel.create(parentWallet);
+    const walletDocument = await this.walletModel.create(parentWallet);
+
+    // create new erc20 balance with ETH and STRK
+    const erc20Balances: Erc20Balances[] = [
+      {
+        wallet: walletDocument,
+        chain: chainDocument,
+        contractAddress: COMMON_CONTRACT_ADDRESS.ETH,
+        amount: '0',
+      },
+      {
+        wallet: walletDocument,
+        chain: chainDocument,
+        contractAddress: COMMON_CONTRACT_ADDRESS.STRK,
+        amount: '0',
+      },
+    ];
+    await this.erc20BalanceModel.insertMany(erc20Balances);
     sendNewWalletMessage(this.bot, msg, seedPhrase, address);
+  }
+
+  private async handleManageWalletsCommand(
+    msg: TelegramBot.Message,
+    msgId?: number,
+  ) {
+    const user = await this.userModel.findOne({ chatId: msg.chat.id });
+    if (!user) {
+      sendNoWalletMessage(this.bot, msg);
+      return;
+    }
+    const wallets = await this.walletModel.find({
+      chatId: user,
+    });
+
+    if (wallets.length === 0) {
+      sendNoWalletMessage(this.bot, msg);
+      return;
+    }
+
+    // send message with list of wallets
+    sendWalletListMessage(this.bot, msg, wallets, msgId);
   }
 }

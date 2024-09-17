@@ -18,6 +18,7 @@ import {
   Wallets,
   WalletSchema,
 } from '@app/shared/models';
+import { PortfolioService } from '../portfolio/portfolio.service';
 
 @Module({
   imports: [
@@ -31,6 +32,6 @@ import {
       { name: NftBalances.name, schema: NftBalanceSchema },
     ]),
   ],
-  providers: [BotService, RedisService],
+  providers: [BotService, RedisService, PortfolioService],
 })
 export class BotModule {}

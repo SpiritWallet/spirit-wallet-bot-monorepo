@@ -46,7 +46,7 @@ export function sendAlreadyCreatedWalletMessage(
   bot: TelegramBot,
   msg: TelegramBot.Message,
 ) {
-  const message = `You already have a wallet!`;
+  const message = `You already have a wallet!\n\nYou can manage your wallets by using the /mywallets command.`;
 
   bot.sendMessage(msg.chat.id, message, {
     parse_mode: 'Markdown',
