@@ -4,6 +4,7 @@ import {
   COMMAND_CALLBACK_DATA_PREFIXS,
   FUNCTIONS_CALLBACK_DATA_PREFIXS,
   PORTFOLIO_CALLBACK_DATA_PREFIXS,
+  SECURITY_AND_PRIVACY_CALLBACK_DATA_PREFIXS,
   TURN_BACK_CALLBACK_DATA_KEYS,
 } from '@app/shared/constants';
 import {
@@ -11,7 +12,7 @@ import {
   NftBalanceDocument,
   WalletDocument,
 } from '@app/shared/models';
-import { shortenAddress } from '@app/shared/utils';
+import { formattedContractAddress, shortenAddress } from '@app/shared/utils';
 import TelegramBot from 'node-telegram-bot-api';
 import { decodeAddress, encodeAddress } from '..';
 import { formatUnits } from 'ethers';
@@ -46,6 +47,14 @@ export const inlineFunctionsKeyboard = (encodedAddress: string) => {
       ],
       [
         {
+          text: 'Security & Privacy',
+          callback_data:
+            FUNCTIONS_CALLBACK_DATA_PREFIXS.SECURITY_AND_PRIVACY +
+            encodedAddress,
+        },
+      ],
+      [
+        {
           text: 'Back to Wallets',
           callback_data: TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLETS,
         },
@@ -66,6 +75,55 @@ export const inlinePortfolioKeyboard = (encodedAddress: string) => {
         {
           text: 'NFT',
           callback_data: PORTFOLIO_CALLBACK_DATA_PREFIXS.NFT + encodedAddress,
+        },
+      ],
+      [
+        {
+          text: 'Back to Wallet Functions',
+          callback_data:
+            TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLET_FUNCTIONS +
+            encodedAddress,
+        },
+      ],
+    ],
+  };
+};
+
+export const inlineBalancesKeyboard = (encodedAddress: string) => {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: 'Transfer',
+          callback_data:
+            FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER + encodedAddress,
+        },
+        {
+          text: 'Bulk Transfer',
+          callback_data:
+            FUNCTIONS_CALLBACK_DATA_PREFIXS.BULK_TRANSFER + encodedAddress,
+        },
+      ],
+      [
+        {
+          text: 'Back to Portfolio',
+          callback_data:
+            TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_PORTFOLIO + encodedAddress,
+        },
+      ],
+    ],
+  };
+};
+
+export const inlineSecurityAndPrivacyKeyboard = (encodedAddress: string) => {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: 'Export Private Key',
+          callback_data:
+            SECURITY_AND_PRIVACY_CALLBACK_DATA_PREFIXS.EXPORT_PRIVATE_KEY +
+            encodedAddress,
         },
       ],
       [
@@ -172,21 +230,40 @@ export function classifyWalletFunction(
     case FUNCTIONS_CALLBACK_DATA_PREFIXS.DEPLOY_WALLET:
       break;
     case FUNCTIONS_CALLBACK_DATA_PREFIXS.PORTFOLIO:
-      bot.editMessageText('Which asset do you want to see?', {
-        chat_id: callbackQuery.message.chat.id,
-        message_id: callbackQuery.message.message_id,
-        parse_mode: 'Markdown',
-        reply_markup: inlinePortfolioKeyboard(encodedAddress),
-      });
+      sendPortfolioMessage(bot, callbackQuery);
       break;
     case FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER:
       break;
     case FUNCTIONS_CALLBACK_DATA_PREFIXS.BULK_TRANSFER:
       break;
+    case FUNCTIONS_CALLBACK_DATA_PREFIXS.SECURITY_AND_PRIVACY:
+      bot.editMessageText('Security & Privacy', {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: 'Markdown',
+        reply_markup: inlineSecurityAndPrivacyKeyboard(encodedAddress),
+      });
+      break;
   }
 }
 
-export async function sendPortfolioMessage(
+export function sendPortfolioMessage(
+  bot: TelegramBot,
+  callbackQuery: TelegramBot.CallbackQuery,
+) {
+  const encodedAddress = callbackQuery.data
+    .replace(TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_PORTFOLIO, '')
+    .replace(FUNCTIONS_CALLBACK_DATA_PREFIXS.PORTFOLIO, '');
+
+  bot.editMessageText('Which asset do you want to see?', {
+    chat_id: callbackQuery.message.chat.id,
+    message_id: callbackQuery.message.message_id,
+    parse_mode: 'Markdown',
+    reply_markup: inlinePortfolioKeyboard(encodedAddress),
+  });
+}
+
+export async function sendBalanceMessage(
   bot: TelegramBot,
   callbackQuery: TelegramBot.CallbackQuery,
   balances: Erc20BalancesDto[],
@@ -202,5 +279,51 @@ export async function sendPortfolioMessage(
     chat_id: callbackQuery.message.chat.id,
     message_id: callbackQuery.message.message_id,
     parse_mode: 'Markdown',
+    reply_markup: inlineBalancesKeyboard(encodedAddress),
   });
+}
+
+export function sendExportSeedPhraseMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+  seedPhrase: string,
+) {
+  const message = `Here is your seed phrase:
+  \n${'`'}${seedPhrase}${'`'}
+  \nPlease keep it safe and secure. Don't share it with anyone. If you lose it, you will lose access to your wallet and all your assets.
+  \nThis message will be deleted automatically in 30 seconds.`;
+
+  bot
+    .sendMessage(msg.chat.id, message, {
+      parse_mode: 'Markdown',
+    })
+    .then((sentMessage) => {
+      // Delete the message after 30 seconds
+      setTimeout(() => {
+        bot.deleteMessage(sentMessage.chat.id, sentMessage.message_id);
+      }, 30000);
+    });
+}
+
+export function sendPrivateKeyMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+  walletAddress: string,
+  privateKey: string,
+) {
+  const message = `Here is your private key of wallet address ${'`'}${walletAddress}${'`'}:
+  \n\n${'`'}${privateKey}${'`'}
+  \n\nPlease keep it safe and secure. Don't share it with anyone. If you lose it, you will lose access to your wallet and all your assets.
+  \nThis message will be deleted automatically in 30 seconds.`;
+
+  bot
+    .sendMessage(msg.chat.id, message, {
+      parse_mode: 'Markdown',
+    })
+    .then((sentMessage) => {
+      // Delete the message after 30 seconds
+      setTimeout(() => {
+        bot.deleteMessage(sentMessage.chat.id, sentMessage.message_id);
+      }, 30000);
+    });
 }

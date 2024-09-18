@@ -4,11 +4,15 @@ export enum BotCommand {
   Start = '/start',
   NewWallet = '/newwallet',
   MyWallets = '/mywallets',
-  Help = '/help',
+  ExportSeedPhrase = '/exportseedphrase',
+  About = '/about',
 }
 
 export enum UserState {
-  AwaitingPassword = 'AwaitingPassword',
+  AwaitingNewWallet = 'AwaitingNewWallet',
+  AwaitingPasswordConfirmation = 'AwaitingPasswordConfirmation',
+  AwaitingExportSeedPhrase = 'AwaitingExportSeedPhrase',
+  AwaitingExportPrivateKey = 'AwaitingExportPrivateKey',
 }
 
 export enum ContractStandard {
