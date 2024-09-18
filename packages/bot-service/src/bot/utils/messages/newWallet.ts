@@ -25,23 +25,6 @@ export function sendNewWalletMessage(
     });
 }
 
-export function sendInvalidPasswordMessage(
-  bot: TelegramBot,
-  msg: TelegramBot.Message,
-) {
-  const message = `Invalid password!
-  \nPassword must:
-  - Be at least *8 characters long*, contain at least one lowercase letter
-  - Contain at least *one upercase letter*
-  - Contain at least *one number*
-  - Contain at least *one special character*
-  \nPlease try again.`;
-
-  bot.sendMessage(msg.chat.id, message, {
-    parse_mode: 'Markdown',
-  });
-}
-
 export function sendAlreadyCreatedWalletMessage(
   bot: TelegramBot,
   msg: TelegramBot.Message,
