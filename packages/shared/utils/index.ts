@@ -2,3 +2,4 @@
 
 export * from './bigNumberishToText';
 export * from './formatContractAddress';
+export * from './wallet';

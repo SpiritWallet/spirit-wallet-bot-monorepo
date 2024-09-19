@@ -10,6 +10,16 @@ networks:
     driver: bridge
 
 services:
+  redis:
+    image: redis:7.4.0-alpine3.20
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - app-network
+    restart: always
+    user: '1000:1000'
+
   mongo:
     image: mongo:7.0.14
     networks:
@@ -22,7 +32,6 @@ services:
       - mongo_log:/data/log
     ports:
       - 127.0.0.1:27018:27017
-    user: '1000:1000'
 
   bot-service:
     container_name: spirit-wallet
@@ -40,6 +49,7 @@ services:
     restart: always
     depends_on:
       - mongo
+      - redis
     ports:
       - '5001:5001'
     user: '1000:1000'

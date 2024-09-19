@@ -4,18 +4,6 @@ import configuration from '@app/shared/configuration';
 import { Injectable } from '@nestjs/common';
 import TelegramBot from 'node-telegram-bot-api';
 import {
-  decodeAddress,
-  decryptWithPBEAndSecret,
-  encryptSeedPhrase,
-  generateSeedPhrase,
-  getStarkPk,
-  getWalletAddress,
-  hashPassword,
-  isValidPassword,
-  verifyPassword,
-} from './utils';
-import {
-  classifyWalletFunction,
   sendAlreadyCreatedWalletMessage,
   sendExportSeedPhraseMessage,
   sendInvalidPasswordMessage,
@@ -30,7 +18,8 @@ import {
   sendWrongPasswordMessage,
   sendPortfolioMessage,
   sendPrivateKeyMessage,
-} from './utils/messages';
+  sendErrorMessage,
+} from '@app/shared/messages';
 import { RedisService } from '../redis/redis.service';
 import { BotCommand, UserState } from '@app/shared/types';
 import {
@@ -49,6 +38,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import {
   COMMAND_CALLBACK_DATA_PREFIXS,
   COMMON_CONTRACT_ADDRESS,
+  FUNCTIONS_CALLBACK_DATA_PREFIXS,
   PORTFOLIO_CALLBACK_DATA_PREFIXS,
   SECURITY_AND_PRIVACY_CALLBACK_DATA_PREFIXS,
   SPECIAL_PREFIXS,
@@ -56,7 +46,19 @@ import {
 } from '@app/shared/constants';
 import { PortfolioService } from '../portfolio/portfolio.service';
 import { Erc20BalancesDto } from '@app/shared/dto';
-import { formattedContractAddress } from '@app/shared/utils';
+import {
+  decodeAddress,
+  decryptWithPBEAndSecret,
+  encryptSeedPhrase,
+  formattedContractAddress,
+  generateSeedPhrase,
+  getStarkPk,
+  getWalletAddress,
+  hashPassword,
+  isValidPassword,
+  verifyPassword,
+} from '@app/shared/utils';
+import { WalletService } from '../wallet/wallet.service';
 
 @Injectable()
 export class BotService {
@@ -71,6 +73,7 @@ export class BotService {
     private readonly erc20BalanceModel: Model<Erc20BalanceDocument>,
     private readonly redisService: RedisService,
     private readonly portfolioService: PortfolioService,
+    private readonly walletService: WalletService,
   ) {
     this.bot = new TelegramBot(configuration().TELEGRAM_BOT_TOKEN, {
       polling: true,
@@ -213,6 +216,30 @@ export class BotService {
           this.handleExportPrivateKeyCommand(msg, user, encodedAddress);
         }
       }
+
+      // handle invoke transaction command
+      if (state.startsWith(UserState.AwaitingInvokeTransaction)) {
+        // if user entered a password
+        if (message) {
+          // delete user's password message
+          await this.bot.deleteMessage(msg.chat.id, msg.message_id);
+          // check if the password is matching
+          const user = await this.userModel.findOne({ chatId: msg.chat.id });
+          // verify the password
+          const isMatchingPassword = await this.isMatchingPassword(msg, user);
+          if (!isMatchingPassword) {
+            return;
+          }
+
+          // delete the state
+          await this.redisService.del(`user:${chatId}:state`);
+          // send a private key message to the user
+          const [, encodedAddress] = state.split(
+            UserState.AwaitingInvokeTransaction + '_',
+          );
+          this.handleInvokeTransactionCommand(msg, user, encodedAddress);
+        }
+      }
     });
   }
 
@@ -231,8 +258,15 @@ export class BotService {
 
       // send message of specific function
       if (data.startsWith(SPECIAL_PREFIXS.FUNCTION)) {
-        classifyWalletFunction(this.bot, callbackQuery);
-        return;
+        const isRequirePassword = this.walletService.classifyWalletFunction(
+          this.bot,
+          callbackQuery,
+        );
+        if (!isRequirePassword) return;
+
+        const combinedValue = UserState.AwaitingInvokeTransaction + '_' + data;
+
+        this.requirePassword(callbackQuery.message, combinedValue);
       }
 
       // execute portfolio function
@@ -263,7 +297,6 @@ export class BotService {
             SECURITY_AND_PRIVACY_CALLBACK_DATA_PREFIXS.EXPORT_PRIVATE_KEY,
             '',
           );
-        console.log(combinedValue);
 
         await this.requirePassword(callbackQuery.message, combinedValue);
         return;
@@ -441,6 +474,37 @@ export class BotService {
     );
 
     const privateKey = getStarkPk(seedPhrase, wallet.index);
-    sendPrivateKeyMessage(this.bot, msg, address, privateKey);
+    sendPrivateKeyMessage(this.bot, msg, privateKey);
+  }
+
+  private async handleInvokeTransactionCommand(
+    msg: TelegramBot.Message,
+    userDocument: UserDocument,
+    context: string,
+  ) {
+    const [fnPrefix, functionName, encodedAddress] = context.split('_');
+    const combinedPrefix = fnPrefix + '_' + functionName + '_';
+    const address = decodeAddress(encodedAddress);
+
+    let txHash: string = null;
+    try {
+      switch (combinedPrefix) {
+        case FUNCTIONS_CALLBACK_DATA_PREFIXS.DEPLOY_WALLET:
+          txHash = await this.walletService.handleDeployWallet(
+            this.bot,
+            msg,
+            userDocument,
+            address,
+          );
+          break;
+        case FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER:
+          break;
+        case FUNCTIONS_CALLBACK_DATA_PREFIXS.BULK_TRANSFER:
+          break;
+      }
+    } catch (error) {
+      console.log(error);
+      sendErrorMessage(this.bot, msg, error);
+    }
   }
 }

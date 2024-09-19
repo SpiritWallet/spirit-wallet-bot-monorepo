@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-import { formattedContractAddress } from '@app/shared/utils';
+import { formattedContractAddress } from '../utils';
 import TelegramBot from 'node-telegram-bot-api';
 
 export function sendNewWalletMessage(

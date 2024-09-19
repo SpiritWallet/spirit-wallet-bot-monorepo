@@ -6,17 +6,17 @@ import {
   PORTFOLIO_CALLBACK_DATA_PREFIXS,
   SECURITY_AND_PRIVACY_CALLBACK_DATA_PREFIXS,
   TURN_BACK_CALLBACK_DATA_KEYS,
-} from '@app/shared/constants';
+} from '../constants';
 import {
   Erc20BalanceDocument,
   NftBalanceDocument,
   WalletDocument,
-} from '@app/shared/models';
-import { formattedContractAddress, shortenAddress } from '@app/shared/utils';
+} from '../models';
+
 import TelegramBot from 'node-telegram-bot-api';
-import { decodeAddress, encodeAddress } from '..';
 import { formatUnits } from 'ethers';
-import { Erc20BalancesDto } from '@app/shared/dto';
+import { Erc20BalancesDto } from '../dto';
+import { shortenAddress, encodeAddress, decodeAddress } from '../utils';
 
 export const inlineFunctionsKeyboard = (encodedAddress: string) => {
   return {
@@ -218,35 +218,6 @@ export function sendWalletFunctionMessage(
   });
 }
 
-export function classifyWalletFunction(
-  bot: TelegramBot,
-  callbackQuery: TelegramBot.CallbackQuery,
-) {
-  const data = callbackQuery.data;
-  const [fnPrefix, functionName, encodedAddress] = data.split('_');
-  const combinedPrefix = fnPrefix + '_' + functionName + '_';
-
-  switch (combinedPrefix) {
-    case FUNCTIONS_CALLBACK_DATA_PREFIXS.DEPLOY_WALLET:
-      break;
-    case FUNCTIONS_CALLBACK_DATA_PREFIXS.PORTFOLIO:
-      sendPortfolioMessage(bot, callbackQuery);
-      break;
-    case FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER:
-      break;
-    case FUNCTIONS_CALLBACK_DATA_PREFIXS.BULK_TRANSFER:
-      break;
-    case FUNCTIONS_CALLBACK_DATA_PREFIXS.SECURITY_AND_PRIVACY:
-      bot.editMessageText('Security & Privacy', {
-        chat_id: callbackQuery.message.chat.id,
-        message_id: callbackQuery.message.message_id,
-        parse_mode: 'Markdown',
-        reply_markup: inlineSecurityAndPrivacyKeyboard(encodedAddress),
-      });
-      break;
-  }
-}
-
 export function sendPortfolioMessage(
   bot: TelegramBot,
   callbackQuery: TelegramBot.CallbackQuery,
@@ -308,11 +279,10 @@ export function sendExportSeedPhraseMessage(
 export function sendPrivateKeyMessage(
   bot: TelegramBot,
   msg: TelegramBot.Message,
-  walletAddress: string,
   privateKey: string,
 ) {
-  const message = `Here is your private key of wallet address ${'`'}${walletAddress}${'`'}:
-  \n\n${'`'}${privateKey}${'`'}
+  const message = `Here is your private key of your wallet address:
+  \n${'`'}${privateKey}${'`'}
   \n\nPlease keep it safe and secure. Don't share it with anyone. If you lose it, you will lose access to your wallet and all your assets.
   \nThis message will be deleted automatically in 30 seconds.`;
 
@@ -326,4 +296,68 @@ export function sendPrivateKeyMessage(
         bot.deleteMessage(sentMessage.chat.id, sentMessage.message_id);
       }, 30000);
     });
+}
+
+export function sendSecurityAndPrivacyMessage(
+  bot: TelegramBot,
+  callbackQuery: TelegramBot.CallbackQuery,
+) {
+  const data = callbackQuery.data;
+  const [, , encodedAddress] = data.split('_');
+
+  bot.editMessageText('Security & Privacy', {
+    chat_id: callbackQuery.message.chat.id,
+    message_id: callbackQuery.message.message_id,
+    parse_mode: 'Markdown',
+    reply_markup: inlineSecurityAndPrivacyKeyboard(encodedAddress),
+  });
+}
+
+export function sendAlreadyDeployedWalletMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+  txHash: string,
+  encodedAddress: string,
+) {
+  const message = `You already have a deployed wallet!\n\nHere is your transaction hash: [${txHash}](https://sepolia.starkscan.co/tx/${txHash}).`;
+
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: 'Back to wallet functions',
+            callback_data:
+              TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLET_FUNCTIONS +
+              encodedAddress,
+          },
+        ],
+      ],
+    },
+  });
+}
+
+export function sendDeployWalletSuccessMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+  txHash: string,
+  encodeAddress: string,
+) {
+  const message = `Your wallet has been successfully deployed!\n\nHere is your transaction hash: [${txHash}](https://sepolia.starkscan.co/tx/${txHash}).`;
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: 'Back to wallet functions',
+            callback_data:
+              TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLET_FUNCTIONS +
+              encodeAddress,
+          },
+        ],
+      ],
+    },
+  });
 }
