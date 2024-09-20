@@ -33,6 +33,7 @@ export const SECURITY_AND_PRIVACY_CALLBACK_DATA_PREFIXS = {
 };
 
 export const TURN_BACK_CALLBACK_DATA_KEYS = {
+  BACK_TO_START: 'back_to_start',
   BACK_TO_WALLETS: 'back_to_wallets',
   BACK_TO_WALLET_FUNCTIONS: 'back_to_functions_',
   BACK_TO_PORTFOLIO: 'back_to_portfolio_',

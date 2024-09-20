@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import TelegramBot from 'node-telegram-bot-api';
+import { TURN_BACK_CALLBACK_DATA_KEYS } from '../constants';
 
 export function sendPasswordMessage(
   bot: TelegramBot,
@@ -32,6 +33,28 @@ export function sendRequirePasswordMessage(
 
   bot.sendMessage(msg.chat.id, message, {
     parse_mode: 'Markdown',
+  });
+}
+
+export function sendWrongPasswordConfirmationMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+) {
+  const message = `Wrong password confirmation!
+  \nPlease try again.`;
+
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: 'Cancel',
+            callback_data: TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_START,
+          },
+        ],
+      ],
+    },
   });
 }
 

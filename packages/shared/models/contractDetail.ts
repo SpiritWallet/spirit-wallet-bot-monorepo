@@ -8,7 +8,7 @@ import { ContractStandard } from '@app/shared';
 
 export type ContractDetailDocument = ContractDetails & Document;
 
-@Schema()
+@Schema({ timestamps: true })
 export class ContractDetails extends BaseModel {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Chains', required: true })
   chain: ChainDocument;

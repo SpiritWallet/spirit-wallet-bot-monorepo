@@ -8,7 +8,7 @@ import { UserDocument } from './user';
 
 export type WalletDocument = Wallets & Document;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Wallets extends BaseModel {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Users', required: true })
   chatId: UserDocument;
