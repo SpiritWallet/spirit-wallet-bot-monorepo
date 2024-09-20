@@ -7,7 +7,7 @@ import { ChainDocument } from './chain';
 
 export type UserDocument = Users & Document;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Users extends BaseModel {
   @Prop({ required: true })
   chatId: number;

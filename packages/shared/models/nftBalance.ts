@@ -8,7 +8,7 @@ import { WalletDocument } from './wallet';
 
 export type NftBalanceDocument = NftBalances & Document;
 
-@Schema()
+@Schema({ timestamps: true })
 export class NftBalances extends BaseModel {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Chains', required: true })
   chain: ChainDocument;

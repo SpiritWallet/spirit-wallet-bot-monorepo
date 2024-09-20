@@ -9,11 +9,17 @@ export enum BotCommand {
 }
 
 export enum UserState {
-  AwaitingNewWallet = 'AwaitingNewWallet',
+  AwaitingNewPassword = 'AwaitingNewPassword',
   AwaitingPasswordConfirmation = 'AwaitingPasswordConfirmation',
+  AwaitingImportSeedPhrase = 'AwaitingImportSeedPhrase',
   AwaitingExportSeedPhrase = 'AwaitingExportSeedPhrase',
   AwaitingExportPrivateKey = 'AwaitingExportPrivateKey',
   AwaitingInvokeTransaction = 'AwaitingInvokeTransaction',
+}
+
+export enum NewWalletAction {
+  CreateNewWallet = 'CreateNewWallet',
+  RestoreWallet = 'RestoreWallet',
 }
 
 export enum ContractStandard {

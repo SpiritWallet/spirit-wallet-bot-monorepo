@@ -9,7 +9,7 @@ import { TransactionStatus, TransactionType } from '@app/shared/types';
 
 export type TransactionDocument = Transactions & Document;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Transactions extends BaseModel {
   @Prop({ required: true })
   hash: string;

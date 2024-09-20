@@ -55,6 +55,15 @@ export function generateSeedPhrase(): string {
   return mnemonic;
 }
 
+export function validatePhrase(phrase: string) {
+  try {
+    HDNodeWallet.fromPhrase(phrase);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 export function getWalletAddress(seedPhrase: string, index: number): string {
   return formattedContractAddress(
     computeAddressFromMnemonic(seedPhrase, ACCOUNT_CLASS_HASH, index),

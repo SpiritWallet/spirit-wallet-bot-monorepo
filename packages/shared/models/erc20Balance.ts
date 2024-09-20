@@ -8,7 +8,7 @@ import { WalletDocument } from './wallet';
 
 export type Erc20BalanceDocument = Erc20Balances & Document;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Erc20Balances extends BaseModel {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Chains', required: true })
   chain: ChainDocument;
