@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import { TURN_BACK_CALLBACK_DATA_KEYS } from '../constants';
-import { NewWalletAction } from '../types';
+import { WalletAction } from '../types';
 import { formattedContractAddress } from '../utils';
 import TelegramBot from 'node-telegram-bot-api';
 
@@ -18,13 +18,13 @@ export function sendOptiontoCreateNewWalletMessage(
         [
           {
             text: 'Create a new wallet',
-            callback_data: NewWalletAction.CreateNewWallet,
+            callback_data: WalletAction.CreateNewWallet,
           },
         ],
         [
           {
             text: 'Restore an existing wallet',
-            callback_data: NewWalletAction.RestoreWallet,
+            callback_data: WalletAction.RestoreWallet,
           },
         ],
       ],
@@ -53,12 +53,56 @@ export function askImportSeedPhraseMessage(
   });
 }
 
+export function sendRequireSeedPhraseMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+) {
+  const message = `Before resetting your password, you need to provide your seed phrase:
+  \n\nPlease enter your seed phrase:`;
+
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: 'Cancel',
+            callback_data: TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_START,
+          },
+        ],
+      ],
+    },
+  });
+}
+
 export function sendInvalidSeedPhraseMessage(
   bot: TelegramBot,
   msg: TelegramBot.Message,
 ) {
   const message = `Invalid seed phrase!
     \nPlease try again.`;
+
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: 'Cancel',
+            callback_data: TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_START,
+          },
+        ],
+      ],
+    },
+  });
+}
+
+export function sendMissMatchSeedPhraseMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+) {
+  const message = `Your seed phrase is not matching!
+  \nPlease try again.`;
 
   bot.sendMessage(msg.chat.id, message, {
     parse_mode: 'Markdown',
