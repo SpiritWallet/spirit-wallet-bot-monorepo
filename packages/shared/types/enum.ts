@@ -13,6 +13,7 @@ export enum UserState {
   AwaitingPasswordConfirmation = 'AwaitingPasswordConfirmation',
   AwaitingExportSeedPhrase = 'AwaitingExportSeedPhrase',
   AwaitingExportPrivateKey = 'AwaitingExportPrivateKey',
+  AwaitingInvokeTransaction = 'AwaitingInvokeTransaction',
 }
 
 export enum ContractStandard {

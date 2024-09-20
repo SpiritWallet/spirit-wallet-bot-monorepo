@@ -1,0 +1,156 @@
+// SPDX-License-Identifier: MIT
+
+import { Injectable } from '@nestjs/common';
+import TelegramBot from 'node-telegram-bot-api';
+import {
+  COMMON_CONTRACT_ADDRESS,
+  FUNCTIONS_CALLBACK_DATA_PREFIXS,
+  TURN_BACK_CALLBACK_DATA_KEYS,
+} from '@app/shared/constants';
+import {
+  sendAlreadyDeployedWalletMessage,
+  sendDeployWalletFailedErrorMessage,
+  sendDeployWalletSuccessMessage,
+  sendInsufficientBalanceErrorMessage,
+  sendNoWalletMessage,
+  sendPortfolioMessage,
+  sendSecurityAndPrivacyMessage,
+} from '@app/shared/messages';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import {
+  WalletDocument,
+  Wallets,
+  UserDocument,
+  Erc20Balances,
+  Erc20BalanceDocument,
+} from '@app/shared/models';
+import {
+  encodeAddress,
+  decryptWithPBEAndSecret,
+  getStarkPk,
+} from '@app/shared/utils';
+import { Web3Service } from '@app/web3/web3.service';
+
+@Injectable()
+export class WalletService {
+  constructor(
+    @InjectModel(Wallets.name)
+    private readonly walletModel: Model<WalletDocument>,
+    @InjectModel(Erc20Balances.name)
+    private readonly erc20BalanceModel: Model<Erc20BalanceDocument>,
+    private readonly web3Service: Web3Service,
+  ) {}
+
+  classifyWalletFunction(
+    bot: TelegramBot,
+    callbackQuery: TelegramBot.CallbackQuery,
+  ): boolean {
+    const data = callbackQuery.data;
+    const [fnPrefix, functionName, encodedAddress] = data.split('_');
+    const combinedPrefix = fnPrefix + '_' + functionName + '_';
+
+    let isRequirePassword = false;
+    switch (combinedPrefix) {
+      case FUNCTIONS_CALLBACK_DATA_PREFIXS.DEPLOY_WALLET:
+        isRequirePassword = true;
+        break;
+      case FUNCTIONS_CALLBACK_DATA_PREFIXS.PORTFOLIO:
+        sendPortfolioMessage(bot, callbackQuery);
+        break;
+      case FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER:
+        isRequirePassword = true;
+        break;
+      case FUNCTIONS_CALLBACK_DATA_PREFIXS.BULK_TRANSFER:
+        isRequirePassword = true;
+        break;
+      case FUNCTIONS_CALLBACK_DATA_PREFIXS.SECURITY_AND_PRIVACY:
+        sendSecurityAndPrivacyMessage(bot, callbackQuery);
+        break;
+    }
+
+    return isRequirePassword;
+  }
+
+  async handleDeployWallet(
+    bot: TelegramBot,
+    msg: TelegramBot.Message,
+    user: UserDocument,
+    address: string,
+  ): Promise<string> {
+    const wallet = await this.walletModel.findOne({
+      chatId: user,
+      address,
+    });
+
+    if (!wallet) {
+      sendNoWalletMessage(bot, msg);
+      return null;
+    }
+
+    if (wallet.isDeployed) {
+      sendAlreadyDeployedWalletMessage(
+        bot,
+        msg,
+        wallet.deployTxHash,
+        encodeAddress(address),
+      );
+      return null;
+    }
+
+    // check if sufficient balance
+    const walletBalance = await this.erc20BalanceModel.findOne({
+      wallet: wallet._id,
+      contractAddress: COMMON_CONTRACT_ADDRESS.ETH,
+    });
+
+    const { seedPhrase: encryptedSeedPhrase, iv, salt } = user;
+    const seedPhrase = await decryptWithPBEAndSecret(
+      encryptedSeedPhrase,
+      msg.text,
+      iv,
+      salt,
+    );
+
+    const privateKey = getStarkPk(seedPhrase, wallet.index);
+
+    // estimate gas
+    const gas = await this.web3Service.estimateAccountDeployGas(
+      address,
+      privateKey,
+    );
+
+    if (Number(walletBalance.amount) < Number(gas)) {
+      sendInsufficientBalanceErrorMessage(
+        bot,
+        msg,
+        gas,
+        encodeAddress(address),
+      );
+      return null;
+    }
+
+    // deploy wallet
+    const txHash = await this.web3Service.deployAccount(address, privateKey);
+    const isSuccess = await this.web3Service.awaitTransaction(txHash);
+
+    if (!isSuccess.isSuccess) {
+      sendDeployWalletFailedErrorMessage(
+        bot,
+        msg,
+        txHash,
+        encodeAddress(address),
+      );
+      return null;
+    }
+
+    // update wallet status
+    await this.walletModel.updateOne(
+      { _id: wallet._id },
+      { isDeployed: true, deployTxHash: txHash },
+    );
+
+    sendDeployWalletSuccessMessage(bot, msg, txHash, encodeAddress(address));
+    return txHash;
+  }
+}
