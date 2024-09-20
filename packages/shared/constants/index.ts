@@ -13,6 +13,7 @@ export const SPECIAL_PREFIXS = {
   FUNCTION: 'fn_',
   PORTFOLIO: 'pf_',
   SECURITY_AND_PRIVACY: 'sp_',
+  FORGOT_PASSWORD: 'forgot_password',
 };
 
 export const FUNCTIONS_CALLBACK_DATA_PREFIXS = {

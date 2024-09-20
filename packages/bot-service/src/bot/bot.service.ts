@@ -25,9 +25,12 @@ import {
   askImportSeedPhraseMessage,
   sendInvalidSeedPhraseMessage,
   sendImportedWalletMessage,
+  sendRequireSeedPhraseMessage,
+  sendResetPasswordSuccessMessage,
+  sendMissMatchSeedPhraseMessage,
 } from '@app/shared/messages';
 import { RedisService } from '../redis/redis.service';
-import { BotCommand, NewWalletAction, UserState } from '@app/shared/types';
+import { BotCommand, WalletAction, UserState } from '@app/shared/types';
 import {
   ChainDocument,
   Chains,
@@ -198,12 +201,16 @@ export class BotService {
           // delete the state
           await this.redisService.del(`user:${chatId}:state`);
 
-          if (action === NewWalletAction.CreateNewWallet) {
+          if (action === WalletAction.CreateNewWallet) {
             // create new wallet
             this.handleCreateNewWallet(msg);
-          } else if (action === NewWalletAction.RestoreWallet) {
+          } else if (action === WalletAction.RestoreWallet) {
             // restore wallet
-            this.handleRestoreWalletCommand(msg, password);
+            this.handleRestoreWalletCommand(msg);
+          } else if (action.startsWith(WalletAction.ResetPassword)) {
+            // reset password
+            const [, seedPhrase] = action.split(':');
+            this.handleResetPasswordCommand(msg, seedPhrase);
           }
         }
       }
@@ -225,6 +232,35 @@ export class BotService {
           // send a message to the user
           const [, password] = state.split('_');
           await this.handleRestoreWallet(msg, password);
+        }
+      }
+
+      // handle reset password command
+      if (state === UserState.AwaitingResetPassword) {
+        if (message) {
+          // delete user's password message
+          await this.bot.deleteMessage(msg.chat.id, msg.message_id);
+          // check if seed phrase is valid
+
+          if (!validatePhrase(message)) {
+            sendInvalidSeedPhraseMessage(this.bot, msg);
+            return;
+          }
+          // check if seed phrase is matching
+          const user = await this.userModel.findOne({ chatId: chatId });
+          const isMatchingSeedPhrase = await this.isMatchingSeedPhrase(
+            msg,
+            user,
+          );
+          if (!isMatchingSeedPhrase) {
+            sendMissMatchSeedPhraseMessage(this.bot, msg);
+            return;
+          }
+
+          // delete the state
+          await this.redisService.del(`user:${chatId}:state`);
+          const combinedAction = WalletAction.ResetPassword + ':' + message;
+          await this.askNewPassword(msg, combinedAction);
         }
       }
 
@@ -315,7 +351,7 @@ export class BotService {
       }
 
       // handle create new wallet command
-      if (data === NewWalletAction.CreateNewWallet) {
+      if (data === WalletAction.CreateNewWallet) {
         const isExistingWallet = await this.isExistingWallet(
           callbackQuery.message,
         );
@@ -325,12 +361,12 @@ export class BotService {
         }
         await this.askNewPassword(
           callbackQuery.message,
-          NewWalletAction.CreateNewWallet,
+          WalletAction.CreateNewWallet,
         );
         return;
       }
 
-      if (data === NewWalletAction.RestoreWallet) {
+      if (data === WalletAction.RestoreWallet) {
         const isExistingWallet = await this.isExistingWallet(
           callbackQuery.message,
         );
@@ -341,7 +377,7 @@ export class BotService {
 
         await this.askNewPassword(
           callbackQuery.message,
-          NewWalletAction.RestoreWallet,
+          WalletAction.RestoreWallet,
         );
         return;
       }
@@ -401,6 +437,13 @@ export class BotService {
         return;
       }
 
+      // handle forgot password command
+      if (data === SPECIAL_PREFIXS.FORGOT_PASSWORD) {
+        await this.requireSeedPhraseToResetPassword(callbackQuery.message);
+        return;
+      }
+      1;
+
       if (data === TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLETS) {
         const state = await this.redisService.get(
           `user:${callbackQuery.message.chat.id}:state`,
@@ -422,6 +465,23 @@ export class BotService {
         return;
       }
     });
+  }
+
+  private async isMatchingSeedPhrase(
+    msg: TelegramBot.Message,
+    user: UserDocument,
+  ) {
+    const seedPhrase = msg.text;
+    const parentWallet = getWalletAddress(seedPhrase, 0);
+    const wallet = await this.walletModel.findOne({
+      chatId: user,
+      address: parentWallet,
+    });
+    if (!wallet) {
+      return false;
+    }
+
+    return true;
   }
 
   private async isMatchingPassword(
@@ -482,15 +542,54 @@ export class BotService {
     await this.redisService.set(`user:${msg.chat.id}:state`, value);
   }
 
-  private async handleRestoreWalletCommand(
-    msg: TelegramBot.Message,
-    password: string,
-  ) {
+  private async handleRestoreWalletCommand(msg: TelegramBot.Message) {
     askImportSeedPhraseMessage(this.bot, msg);
-
+    const password = msg.text;
     // store user's state in redis
     const combinedValue = UserState.AwaitingImportSeedPhrase + '_' + password;
     await this.redisService.set(`user:${msg.chat.id}:state`, combinedValue);
+  }
+
+  private async handleResetPasswordCommand(
+    msg: TelegramBot.Message,
+    seedPhrase: string,
+  ) {
+    const password = msg.text;
+    const { encryptedSeedPhrase, iv, salt } = await encryptSeedPhrase(
+      seedPhrase,
+      password,
+    );
+
+    // hash the user's password
+    const hashedPassword = await hashPassword(password);
+
+    // create new user entity and save in db
+    const chainDocument = await this.chainModel.findOne();
+    const newUser: Users = {
+      chatId: msg.chat.id,
+      chain: chainDocument,
+      seedPhrase: encryptedSeedPhrase,
+      iv,
+      salt,
+      password: hashedPassword,
+    };
+
+    await this.userModel.findOneAndUpdate(
+      { chatId: msg.chat.id },
+      { $set: newUser },
+    );
+
+    sendResetPasswordSuccessMessage(this.bot, msg);
+  }
+
+  private async requireSeedPhraseToResetPassword(msg: TelegramBot.Message) {
+    sendRequireSeedPhraseMessage(this.bot, msg);
+
+    // store user's state in redis
+    await this.redisService.set(
+      `user:${msg.chat.id}:state`,
+      UserState.AwaitingResetPassword,
+    );
   }
 
   private async handleCreateNewWallet(msg: TelegramBot.Message) {

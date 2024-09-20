@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import TelegramBot from 'node-telegram-bot-api';
-import { TURN_BACK_CALLBACK_DATA_KEYS } from '../constants';
+import { SPECIAL_PREFIXS, TURN_BACK_CALLBACK_DATA_KEYS } from '../constants';
 
 export function sendPasswordMessage(
   bot: TelegramBot,
@@ -33,6 +33,43 @@ export function sendRequirePasswordMessage(
 
   bot.sendMessage(msg.chat.id, message, {
     parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: 'Forgot Password?',
+            callback_data: SPECIAL_PREFIXS.FORGOT_PASSWORD,
+          },
+        ],
+        [
+          {
+            text: 'Cancel',
+            callback_data: TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_START,
+          },
+        ],
+      ],
+    },
+  });
+}
+
+export function sendResetPasswordSuccessMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+) {
+  const message = `Your password has been reset successfully!`;
+
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: 'Back to wallets',
+            callback_data: TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLETS,
+          },
+        ],
+      ],
+    },
   });
 }
 
