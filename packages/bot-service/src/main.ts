@@ -15,10 +15,10 @@ async function bootstrap() {
   app.enableCors();
   app.getHttpAdapter().getInstance().disable('x-powered-by');
 
-  const PORT = 3001;
-
-  await app.listen(PORT, () => {
-    console.log(`Spirit Wallet Bot service is running on port ${PORT}`);
+  await app.listen(configuration().PORTS.BOT_SERVICE, () => {
+    console.log(
+      `Spirit Wallet Bot service is running on port ${configuration().PORTS.BOT_SERVICE}`,
+    );
   });
 }
 // AppClusterService.clusterize(bootstrap);

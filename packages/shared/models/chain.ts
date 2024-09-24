@@ -14,6 +14,9 @@ export class Chains extends BaseModel {
   @Prop({ required: true })
   rpc: string;
 
+  @Prop({ required: true })
+  delayBlock: number;
+
   @Prop()
   walletClassHash: string;
 }
