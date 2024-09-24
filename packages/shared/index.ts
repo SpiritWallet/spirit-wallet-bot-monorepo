@@ -3,6 +3,7 @@
 export * from './configuration';
 export * from './config';
 export * from './types';
+export * from './BlockedQueue';
 export * as models from './models';
 
 export async function retryUntil<T>(
