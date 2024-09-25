@@ -14,7 +14,7 @@ import {
   TransactionWorkerType,
   retryUntil,
 } from '@app/shared';
-import { Queue } from 'bullmq';
+import { Queue } from 'bull';
 import * as _ from 'lodash';
 import configuration from '@app/shared/configuration';
 import { BlockDocument, ChainDocument } from '@app/shared/models';

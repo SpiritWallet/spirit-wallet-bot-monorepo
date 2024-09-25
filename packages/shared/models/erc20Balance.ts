@@ -21,6 +21,9 @@ export class Erc20Balances extends BaseModel {
 
   @Prop({ required: true })
   amount: string;
+
+  @Prop()
+  latestTimestamp: number;
 }
 
 export const Erc20BalanceSchema = SchemaFactory.createForClass(Erc20Balances);

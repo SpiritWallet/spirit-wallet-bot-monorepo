@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import { Injectable, Logger } from '@nestjs/common';
-import { Queue } from 'bullmq';
+import { Queue } from 'bull';
 import { delay } from './utils/promise';
 
 @Injectable()

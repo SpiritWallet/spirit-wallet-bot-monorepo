@@ -11,8 +11,8 @@ import {
 } from '@app/shared/models';
 import { Model } from 'mongoose';
 import { LogsReturnValues, ONCHAIN_QUEUES } from '@app/shared/types';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import { OnchainQueueService } from '@app/shared/onchainQueue.service';
 import { Web3Service } from '@app/web3/web3.service';
 
