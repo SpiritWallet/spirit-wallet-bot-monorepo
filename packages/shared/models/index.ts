@@ -9,3 +9,4 @@ export * from './transactions';
 export * from './user';
 export * from './wallet';
 export * from './block';
+export * from './nftDetail';

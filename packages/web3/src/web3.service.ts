@@ -52,15 +52,11 @@ export class Web3Service {
     return block.timestamp * 1e3;
   }
 
-  async getContractInstance(
+  getContractInstance(
     abi: any,
     contractAddress: string,
-    rpc?: string,
-  ): Promise<Contract> {
-    if (!rpc) {
-      const chain = await this.chainModel.findOne();
-      rpc = chain.rpc;
-    }
+    rpc: string,
+  ): Contract {
     const provider = this.getProvider(rpc);
     const contractInstance = new Contract(abi, contractAddress, provider);
     return contractInstance;
@@ -124,6 +120,59 @@ export class Web3Service {
 
     await provider.waitForTransaction(txHash);
     return txHash;
+  }
+
+  async getERC1155Balance(
+    address: string,
+    owner: string,
+    tokenId: string,
+    rpc?: string,
+  ): Promise<string> {
+    const chain = await this.chainModel.findOne();
+
+    if (!rpc) {
+      rpc = chain.rpc;
+    }
+
+    const contractInstance = this.getContractInstance(
+      ABIS.ERC1155ABI,
+      address,
+      rpc,
+    );
+    const balanecOfOperator = [
+      () => contractInstance.balanceOf(owner, tokenId),
+      () => contractInstance.balance_of(owner, tokenId),
+    ];
+
+    const balance: BigInt = await attemptOperations(balanecOfOperator);
+
+    return balance.toString();
+  }
+
+  async getErc20Balance(
+    address: string,
+    owner: string,
+    rpc?: string,
+  ): Promise<string> {
+    const chain = await this.chainModel.findOne();
+
+    if (!rpc) {
+      rpc = chain.rpc;
+    }
+
+    const contractInstance = this.getContractInstance(
+      ABIS.ERC20ABI,
+      address,
+      rpc,
+    );
+    const balanceOfOperator = [
+      () => contractInstance.balanceOf(owner),
+      () => contractInstance.balance_of(owner),
+    ];
+
+    const balance: BigInt = await attemptOperations(balanceOfOperator);
+
+    return balance.toString();
   }
 
   async awaitTransaction(
@@ -218,14 +267,66 @@ export class Web3Service {
     return null;
   }
 
+  async getContractDetail(
+    address: string,
+    rpc: string,
+  ): Promise<{
+    standard: ContractStandard;
+    name: string;
+    symbol: string;
+    decimals: number;
+  }> {
+    const standard = await this.getContractStandard(address, rpc);
+
+    if (!standard) return null;
+
+    if (standard === ContractStandard.ERC20) {
+      const erc20Detail = await this.getErc20Detail(address, rpc);
+      return {
+        standard: standard,
+        name: erc20Detail.name,
+        symbol: erc20Detail.symbol,
+        decimals: erc20Detail.decimals,
+      };
+    }
+    const nftCollectionDetail = await this.getNFTCollectionDetail(address, rpc);
+    return {
+      standard: standard,
+      name: nftCollectionDetail.name,
+      symbol: nftCollectionDetail.symbol,
+      decimals: 1,
+    };
+  }
+
+  async getErc20Detail(
+    address: string,
+    rpc: string,
+  ): Promise<{
+    name: string;
+    symbol: string;
+    decimals: number;
+  }> {
+    const provider = this.getProvider(rpc);
+    const erc20Instance = new Contract(ABIS.ERC20ABI, address, provider);
+
+    const name = await erc20Instance.name();
+    const symbol = await erc20Instance.symbol();
+    const decimals = await erc20Instance.decimals();
+
+    return {
+      name: name ? convertDataIntoString(name) : null,
+      symbol: symbol ? convertDataIntoString(symbol) : null,
+      decimals: Number(decimals.toString()),
+    };
+  }
+
   async getNFTCollectionDetail(
     address: string,
     rpc: string,
   ): Promise<{
     standard: ContractStandard;
-    name?: string;
-    symbol?: string;
-    contractUri?: string;
+    name: string;
+    symbol: string;
   } | null> {
     const provider = this.getProvider(rpc);
     const standard = await this.getContractStandard(address, rpc);

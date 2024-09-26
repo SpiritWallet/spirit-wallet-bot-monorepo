@@ -661,12 +661,14 @@ export class BotService {
         chain: chainDocument,
         contractAddress: COMMON_CONTRACT_ADDRESS.ETH,
         amount: '0',
+        latestTimestamp: 0,
       },
       {
         wallet: walletDocument,
         chain: chainDocument,
         contractAddress: COMMON_CONTRACT_ADDRESS.STRK,
         amount: '0',
+        latestTimestamp: 0,
       },
     ];
     const bulkWriteData = erc20Balances.map((balance) => {

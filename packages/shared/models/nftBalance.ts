@@ -5,6 +5,7 @@ import { Document, SchemaTypes } from 'mongoose';
 import { BaseModel } from './base';
 import { ChainDocument } from './chain';
 import { WalletDocument } from './wallet';
+import { NftDetailDocument } from './nftDetail';
 
 export type NftBalanceDocument = NftBalances & Document;
 
@@ -22,20 +23,14 @@ export class NftBalances extends BaseModel {
   @Prop({ required: true })
   tokenId: string;
 
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'NftDetails', required: true })
+  nftDetail: NftDetailDocument;
+
   @Prop({ required: true })
   amount: string;
 
   @Prop()
-  tokenURI?: string;
-
-  @Prop()
-  name?: string;
-
-  @Prop()
-  description?: string;
-
-  @Prop()
-  image?: string;
+  latestTimestamp: number;
 }
 
 export const NftBalanceSchema = SchemaFactory.createForClass(NftBalances);

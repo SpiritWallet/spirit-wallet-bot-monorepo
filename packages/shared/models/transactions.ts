@@ -4,7 +4,6 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, SchemaTypes } from 'mongoose';
 import { BaseModel } from './base';
 import { ChainDocument } from './chain';
-import { WalletDocument } from './wallet';
 import { TransactionStatus, TransactionType } from '@app/shared/types';
 
 export type TransactionDocument = Transactions & Document;
@@ -23,11 +22,14 @@ export class Transactions extends BaseModel {
   @Prop({ required: true })
   contractAddress: string;
 
-  @Prop({ type: SchemaTypes.ObjectId, ref: 'Wallets' })
-  from?: WalletDocument;
+  @Prop()
+  tokenId?: string;
 
-  @Prop({ type: SchemaTypes.ObjectId, ref: 'Wallets' })
-  to?: WalletDocument;
+  @Prop()
+  from: string;
+
+  @Prop()
+  to: string;
 
   @Prop({ required: true })
   amount: string;

@@ -10,6 +10,7 @@ export default () => ({
   PORTS: {
     BOT_SERVICE: Number(process.env.BOT_SERVICE_PORT),
     ONCHAIN_WORKER: Number(process.env.ONCHAIN_WORKER_PORT),
+    ONCHAIN_QUEUE: Number(process.env.ONCHAIN_QUEUE_PORT),
   },
   REDIS: {
     HOST: String(process.env.REDIS_HOST),

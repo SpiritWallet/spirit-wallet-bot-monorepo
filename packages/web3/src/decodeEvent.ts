@@ -79,7 +79,7 @@ export type ERC1155TransferReturnValue = {
   to: string;
   tokenId: string;
   nftAddress: string;
-  value: number;
+  value: string;
   timestamp: number;
 };
 
@@ -107,7 +107,7 @@ export const decodeERC115Transfer = (
       tokenId: (parsedEvent.TransferSingle.id as bigint).toString(),
       nftAddress,
       timestamp,
-      value: Number((parsedEvent.TransferSingle.value as bigint).toString()),
+      value: (parsedEvent.TransferSingle.value as bigint).toString(),
     };
 
     return returnValue;
@@ -131,7 +131,7 @@ export const decodeERC115Transfer = (
         tokenId: (parsedEvent.TransferSingle.id as bigint).toString(),
         nftAddress,
         timestamp,
-        value: Number((parsedEvent.TransferSingle.value as bigint).toString()),
+        value: (parsedEvent.TransferSingle.value as bigint).toString(),
       };
       return returnValue;
     } catch (error) {
@@ -167,7 +167,7 @@ export const decodeERC115TransferBatch = (
         tokenId: (ids[i] as bigint).toString(),
         nftAddress,
         timestamp,
-        value: Number((values[i] as bigint).toString()),
+        value: (values[i] as bigint).toString(),
       });
     }
 
@@ -194,7 +194,7 @@ export const decodeERC115TransferBatch = (
           tokenId: (ids[i] as bigint).toString(),
           nftAddress,
           timestamp,
-          value: Number((values[i] as bigint).toString()),
+          value: (values[i] as bigint).toString(),
         });
       }
 

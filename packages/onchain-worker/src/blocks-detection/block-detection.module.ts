@@ -4,7 +4,7 @@ import { Module } from '@nestjs/common';
 import { BlockDetectionController } from './block-detection.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { BlockSchema, Blocks, ChainSchema, Chains } from '@app/shared/models';
-import { BullModule } from '@nestjs/bullmq';
+import { BullModule } from '@nestjs/bull';
 import {
   MQ_JOB_DEFAULT_CONFIG,
   ONCHAIN_QUEUES,
