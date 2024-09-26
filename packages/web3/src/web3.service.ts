@@ -149,6 +149,32 @@ export class Web3Service {
     return balance.toString();
   }
 
+  async getErc20Balance(
+    address: string,
+    owner: string,
+    rpc?: string,
+  ): Promise<string> {
+    const chain = await this.chainModel.findOne();
+
+    if (!rpc) {
+      rpc = chain.rpc;
+    }
+
+    const contractInstance = this.getContractInstance(
+      ABIS.ERC20ABI,
+      address,
+      rpc,
+    );
+    const balanceOfOperator = [
+      () => contractInstance.balanceOf(owner),
+      () => contractInstance.balance_of(owner),
+    ];
+
+    const balance: BigInt = await attemptOperations(balanceOfOperator);
+
+    return balance.toString();
+  }
+
   async awaitTransaction(
     txHash: string,
     rpc?: string,
@@ -248,6 +274,7 @@ export class Web3Service {
     standard: ContractStandard;
     name: string;
     symbol: string;
+    decimals: number;
   }> {
     const standard = await this.getContractStandard(address, rpc);
 
@@ -259,6 +286,7 @@ export class Web3Service {
         standard: standard,
         name: erc20Detail.name,
         symbol: erc20Detail.symbol,
+        decimals: erc20Detail.decimals,
       };
     }
     const nftCollectionDetail = await this.getNFTCollectionDetail(address, rpc);
@@ -266,6 +294,7 @@ export class Web3Service {
       standard: standard,
       name: nftCollectionDetail.name,
       symbol: nftCollectionDetail.symbol,
+      decimals: 1,
     };
   }
 
@@ -275,16 +304,19 @@ export class Web3Service {
   ): Promise<{
     name: string;
     symbol: string;
+    decimals: number;
   }> {
     const provider = this.getProvider(rpc);
     const erc20Instance = new Contract(ABIS.ERC20ABI, address, provider);
 
     const name = await erc20Instance.name();
     const symbol = await erc20Instance.symbol();
+    const decimals = await erc20Instance.decimals();
 
     return {
       name: name ? convertDataIntoString(name) : null,
       symbol: symbol ? convertDataIntoString(symbol) : null,
+      decimals: Number(decimals.toString()),
     };
   }
 

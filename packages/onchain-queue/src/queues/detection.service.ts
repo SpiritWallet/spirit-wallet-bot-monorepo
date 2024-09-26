@@ -10,6 +10,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { InjectQueue } from '@nestjs/bull';
 import {
+  ContractStandard,
   EventType,
   JOB_QUEUE_NFT_METADATA,
   LogsReturnValues,
@@ -22,6 +23,7 @@ import {
   ChainDocument,
   ContractDetailDocument,
   ContractDetails,
+  Erc20Balances,
   NftBalanceDocument,
   NftBalances,
   NftDetailDocument,
@@ -46,6 +48,8 @@ export class DetectionSerivce {
     private readonly transactionModel: Model<TransactionDocument>,
     @InjectModel(Wallets.name)
     private readonly walletModel: Model<WalletDocument>,
+    @InjectModel(Erc20Balances.name)
+    private readonly erc20BalanceModel: Model<Erc20Balances>,
     @InjectQueue(QUEUE_METADATA)
     private readonly fetchMetadataQueue: Queue<string>,
     private readonly web3Service: Web3Service,
@@ -59,6 +63,9 @@ export class DetectionSerivce {
     index: number,
   ) {
     const process: any = {};
+    process[EventType.UNKNOWN_MINT] = this.processUnkownMint;
+    process[EventType.UNKNOWN_BURN] = this.processUnkownBurn;
+    process[EventType.UNKNOWN_TRANSFER] = this.processUnkownTransfer;
     process[EventType.MINT_721] = this.processNft721Minted;
     process[EventType.BURN_721] = this.processNft721Burned;
     process[EventType.TRANSFER_721] = this.processNft721Transfered;
@@ -140,6 +147,335 @@ export class DetectionSerivce {
 
     await this.fetchMetadataQueue.add(JOB_QUEUE_NFT_METADATA, nftDetail._id);
     return nftDetailDocument;
+  }
+
+  async processUnkownMint(
+    log: LogsReturnValues,
+    chain: ChainDocument,
+    index: number,
+  ) {
+    const { to, contractAddress, timestamp } =
+      log.returnValues as ERC721OrERC20TransferReturnValue;
+
+    const toUser = await this.walletModel.findOne({ address: to });
+    if (!toUser) return;
+
+    const contractDetail = await this.getOrCreateContractDetail(
+      contractAddress,
+      chain,
+    );
+
+    if (!contractDetail) return;
+
+    if (contractDetail.standard === ContractStandard.ERC721) {
+      await this.processNft721Minted(log, chain, index);
+    } else if (contractDetail.standard === ContractStandard.ERC20) {
+      await this.processErc20Minted(log, chain, index);
+    }
+  }
+
+  async processUnkownBurn(
+    log: LogsReturnValues,
+    chain: ChainDocument,
+    index: number,
+  ) {
+    const { from, contractAddress } =
+      log.returnValues as ERC721OrERC20TransferReturnValue;
+
+    const fromWallet = await this.walletModel.findOne({ address: from });
+    if (!fromWallet) return;
+
+    const contractDetail = await this.getOrCreateContractDetail(
+      contractAddress,
+      chain,
+    );
+
+    if (!contractDetail) return;
+
+    if (contractDetail.standard === ContractStandard.ERC721) {
+      await this.processNft721Burned(log, chain, index);
+    } else if (contractDetail.standard === ContractStandard.ERC20) {
+      await this.processErc20Burned(log, chain, index);
+    }
+  }
+
+  async processUnkownTransfer(
+    log: LogsReturnValues,
+    chain: ChainDocument,
+    index: number,
+  ) {
+    const { from, to, contractAddress } =
+      log.returnValues as ERC721OrERC20TransferReturnValue;
+
+    const fromWallet = await this.walletModel.findOne({ address: from });
+    const toWallet = await this.walletModel.findOne({ address: to });
+    if (!fromWallet && !toWallet) return;
+
+    const contractDetail = await this.getOrCreateContractDetail(
+      contractAddress,
+      chain,
+    );
+
+    if (!contractDetail) return;
+
+    if (contractDetail.standard === ContractStandard.ERC721) {
+      await this.processNft721Transfered(log, chain, index);
+    } else if (contractDetail.standard === ContractStandard.ERC20) {
+      await this.processErc20Transfered(log, chain, index);
+    }
+  }
+
+  async processErc20Minted(
+    log: LogsReturnValues,
+    chain: ChainDocument,
+    index: number,
+  ) {
+    const { from, to, value, contractAddress, timestamp } =
+      log.returnValues as ERC721OrERC20TransferReturnValue;
+
+    const toWallet = await this.walletModel.findOne({ address: to });
+    if (!toWallet) return;
+
+    const contractDetail = await this.getOrCreateContractDetail(
+      contractAddress,
+      chain,
+    );
+
+    if (!contractDetail) return;
+
+    const fromBalance = await this.web3Service.getErc20Balance(
+      contractAddress,
+      from,
+      chain.rpc,
+    );
+
+    if (fromBalance !== '0') {
+      const newErc20Balance: Erc20Balances = {
+        chain,
+        wallet: toWallet,
+        contractAddress,
+        amount: fromBalance,
+        latestTimestamp: timestamp,
+      };
+
+      await this.erc20BalanceModel.findOneAndUpdate(
+        {
+          contractAddress,
+          wallet: toWallet._id,
+        },
+        { $set: newErc20Balance },
+        { new: true, upsert: true },
+      );
+    }
+
+    const transactionDetail: Transactions = {
+      hash: log.transaction_hash,
+      index,
+      chain,
+      contractAddress,
+      from,
+      to,
+      amount: value,
+      status: TransactionStatus.Success,
+      entryPoint: '',
+      type: TransactionType.Mint,
+    };
+
+    await this.transactionModel.findOneAndUpdate(
+      {
+        hash: log.transaction_hash,
+        index,
+      },
+      { $set: transactionDetail },
+      { upsert: true, new: true },
+    );
+
+    this.logger.debug(
+      `erc20 minted ${contractAddress}: ${value} ${from} -> ${to} - ${timestamp}`,
+    );
+  }
+
+  async processErc20Burned(
+    log: LogsReturnValues,
+    chain: ChainDocument,
+    index: number,
+  ) {
+    const { from, to, value, contractAddress, timestamp } =
+      log.returnValues as ERC721OrERC20TransferReturnValue;
+
+    const fromWallet = await this.walletModel.findOne({ address: from });
+    if (!fromWallet) return;
+
+    const contractDetail = await this.getOrCreateContractDetail(
+      contractAddress,
+      chain,
+    );
+
+    if (!contractDetail) return;
+
+    const onchainBalance = await this.web3Service.getErc20Balance(
+      contractAddress,
+      from,
+      chain.rpc,
+    );
+
+    if (onchainBalance !== '0') {
+      const newErc20Balance: Erc20Balances = {
+        chain,
+        wallet: fromWallet,
+        contractAddress,
+        amount: onchainBalance,
+        latestTimestamp: timestamp,
+      };
+
+      await this.erc20BalanceModel.findOneAndUpdate(
+        {
+          contractAddress,
+          wallet: fromWallet._id,
+        },
+        { $set: newErc20Balance },
+        { new: true, upsert: true },
+      );
+    } else {
+      await this.erc20BalanceModel.deleteOne({
+        contractAddress,
+        wallet: fromWallet._id,
+      });
+    }
+
+    const transactionDetail: Transactions = {
+      hash: log.transaction_hash,
+      index,
+      chain,
+      contractAddress,
+      from,
+      to,
+      amount: value,
+      status: TransactionStatus.Success,
+      entryPoint: '',
+      type: TransactionType.Burn,
+    };
+
+    await this.transactionModel.findOneAndUpdate(
+      {
+        hash: log.transaction_hash,
+        index,
+      },
+      { $set: transactionDetail },
+      { upsert: true, new: true },
+    );
+
+    this.logger.debug(
+      `erc20 burned ${contractAddress}: ${value} ${from} -> ${to} - ${timestamp}`,
+    );
+  }
+
+  async processErc20Transfered(
+    log: LogsReturnValues,
+    chain: ChainDocument,
+    index: number,
+  ) {
+    const { from, to, value, contractAddress, timestamp } =
+      log.returnValues as ERC721OrERC20TransferReturnValue;
+
+    const fromWallet = await this.walletModel.findOne({ address: from });
+    const toWallet = await this.walletModel.findOne({ address: to });
+    if (!fromWallet && !toWallet) return;
+
+    const contractDetail = await this.getOrCreateContractDetail(
+      contractAddress,
+      chain,
+    );
+
+    if (!contractDetail) return;
+
+    if (fromWallet) {
+      const fromBalance = await this.web3Service.getErc20Balance(
+        contractAddress,
+        from,
+        chain.rpc,
+      );
+
+      if (fromBalance !== '0') {
+        const newErc20Balance: Erc20Balances = {
+          chain,
+          wallet: fromWallet,
+          contractAddress,
+          amount: fromBalance,
+          latestTimestamp: timestamp,
+        };
+        await this.erc20BalanceModel.findOneAndUpdate(
+          {
+            contractAddress,
+            wallet: fromWallet._id,
+          },
+          { $set: newErc20Balance },
+          { new: true, upsert: true },
+        );
+      } else {
+        await this.erc20BalanceModel.deleteOne({
+          contractAddress,
+          wallet: fromWallet._id,
+        });
+      }
+    }
+
+    if (toWallet) {
+      const toBalance = await this.web3Service.getErc20Balance(
+        contractAddress,
+        to,
+        chain.rpc,
+      );
+
+      if (toBalance !== '0') {
+        const newErc20Balance: Erc20Balances = {
+          chain,
+          wallet: toWallet,
+          contractAddress,
+          amount: toBalance,
+          latestTimestamp: timestamp,
+        };
+        await this.erc20BalanceModel.findOneAndUpdate(
+          {
+            contractAddress,
+            wallet: toWallet._id,
+          },
+          { $set: newErc20Balance },
+          { new: true, upsert: true },
+        );
+      } else {
+        await this.erc20BalanceModel.deleteOne({
+          contractAddress,
+          wallet: toWallet._id,
+        });
+      }
+    }
+
+    const transactionDetail: Transactions = {
+      hash: log.transaction_hash,
+      index,
+      chain,
+      contractAddress,
+      from,
+      to,
+      amount: value,
+      status: TransactionStatus.Success,
+      entryPoint: '',
+      type: TransactionType.Transfer,
+    };
+
+    await this.transactionModel.findOneAndUpdate(
+      {
+        hash: log.transaction_hash,
+        index,
+      },
+      { $set: transactionDetail },
+      { upsert: true, new: true },
+    );
+
+    this.logger.debug(
+      `erc20 transfer ${contractAddress}: ${value} ${from} -> ${to} at - ${timestamp}`,
+    );
   }
 
   async processNft721Minted(

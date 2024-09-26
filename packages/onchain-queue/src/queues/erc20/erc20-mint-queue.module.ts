@@ -10,7 +10,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Web3Service } from '@app/web3/web3.service';
 import { DetectionSerivce } from '../detection.service';
-import { ERC1155MintProcessor } from './processors';
+import { ERC20MintProcessor } from './processors';
 import {
   Chains,
   ChainSchema,
@@ -45,11 +45,11 @@ import {
         defaultJobOptions: MQ_JOB_DEFAULT_CONFIG,
       },
       {
-        name: ONCHAIN_QUEUES.QUEUE_MINT_1155,
+        name: ONCHAIN_QUEUES.QUEUE_MINT_20,
         defaultJobOptions: MQ_JOB_DEFAULT_CONFIG,
       },
     ),
   ],
-  providers: [DetectionSerivce, Web3Service, ERC1155MintProcessor],
+  providers: [DetectionSerivce, Web3Service, ERC20MintProcessor],
 })
-export class Erc1155MintQueueModule {}
+export class Erc20MintQueueModule {}

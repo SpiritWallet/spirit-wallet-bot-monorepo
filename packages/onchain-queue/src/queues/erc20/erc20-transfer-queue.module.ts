@@ -1,6 +1,22 @@
 // SPDX-License-Identifier: MIT
 
 import {
+  ChainSchema,
+  Chains,
+  ContractDetailSchema,
+  ContractDetails,
+  Erc20BalanceSchema,
+  Erc20Balances,
+  NftBalanceSchema,
+  NftBalances,
+  NftDetailSchema,
+  NftDetails,
+  TransactionSchema,
+  Transactions,
+  WalletSchema,
+  Wallets,
+} from '@app/shared/models';
+import {
   MQ_JOB_DEFAULT_CONFIG,
   ONCHAIN_QUEUES,
   QUEUE_METADATA,
@@ -10,23 +26,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Web3Service } from '@app/web3/web3.service';
 import { DetectionSerivce } from '../detection.service';
-import { ERC1155MintProcessor } from './processors';
-import {
-  Chains,
-  ChainSchema,
-  Transactions,
-  TransactionSchema,
-  Wallets,
-  WalletSchema,
-  ContractDetails,
-  ContractDetailSchema,
-  NftBalances,
-  NftBalanceSchema,
-  Erc20BalanceSchema,
-  Erc20Balances,
-  NftDetailSchema,
-  NftDetails,
-} from '@app/shared/models';
+import { ERC20TransferProcessor } from './processors';
 
 @Module({
   imports: [
@@ -45,11 +45,11 @@ import {
         defaultJobOptions: MQ_JOB_DEFAULT_CONFIG,
       },
       {
-        name: ONCHAIN_QUEUES.QUEUE_MINT_1155,
+        name: ONCHAIN_QUEUES.QUEUE_TRANSFER_20,
         defaultJobOptions: MQ_JOB_DEFAULT_CONFIG,
       },
     ),
   ],
-  providers: [DetectionSerivce, Web3Service, ERC1155MintProcessor],
+  providers: [DetectionSerivce, Web3Service, ERC20TransferProcessor],
 })
-export class Erc1155MintQueueModule {}
+export class Erc20TransferQueueModule {}
