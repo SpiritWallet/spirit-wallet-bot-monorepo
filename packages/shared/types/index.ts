@@ -22,3 +22,9 @@ export type LogsReturnValues = SuccessfulTransactionReceiptResponse & {
   eventType: EventType;
   index?: number;
 };
+
+export type Attribute = {
+  trait_type: string;
+  value: any;
+  display_type?: string;
+};
