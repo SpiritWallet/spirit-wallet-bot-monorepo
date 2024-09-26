@@ -4,6 +4,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, SchemaTypes } from 'mongoose';
 import { BaseModel } from './base';
 import { ChainDocument } from './chain';
+import { Attribute } from '../types';
 
 export type NftDetailDocument = NftDetails & Document;
 
@@ -26,6 +27,18 @@ export class NftDetails extends BaseModel {
 
   @Prop()
   description?: string;
+
+  @Prop({ type: SchemaTypes.Array })
+  attributes?: Attribute[];
+
+  @Prop()
+  externalUrl?: string;
+
+  @Prop()
+  animationUrl?: string;
+
+  @Prop()
+  animationPlayType?: string;
 
   @Prop()
   image?: string;

@@ -367,6 +367,49 @@ export class Web3Service {
     };
   }
 
+  async getNFTUri(
+    contractAddress: string,
+    tokenId: string,
+    standard: ContractStandard,
+    rpc: string,
+  ): Promise<string> {
+    const provider = this.getProvider(rpc);
+
+    let abi: any = ABIS.ERC721ABI;
+    let otherVerAbi: any = ABIS.OtherErc721ABI;
+    let oldVerAbi: any = ABIS.OldErc721ABI;
+    if (standard === ContractStandard.ERC1155) {
+      abi = ABIS.ERC1155ABI;
+      otherVerAbi = ABIS.OtherErc1155ABI;
+      oldVerAbi = ABIS.OldErc1155ABI;
+    }
+
+    const contractInstance = new Contract(abi, contractAddress, provider);
+    const otherVerContract = new Contract(
+      otherVerAbi,
+      contractAddress,
+      provider,
+    );
+    const oldVerContract = new Contract(oldVerAbi, contractAddress, provider);
+
+    const tokenUriOperations = [
+      () => contractInstance.token_uri(tokenId),
+      () => contractInstance.tokenURI(tokenId),
+      () => contractInstance.uri(tokenId),
+      () => otherVerContract.token_uri(tokenId),
+      () => otherVerContract.tokenURI(tokenId),
+      () => otherVerContract.uri(tokenId),
+      () => oldVerContract.token_uri(tokenId),
+      () => oldVerContract.tokenURI(tokenId),
+      () => oldVerContract.uri(tokenId),
+    ];
+    const tokenUri = await attemptOperations(tokenUriOperations);
+
+    if (!tokenUri) return null;
+
+    return convertDataIntoString(tokenUri);
+  }
+
   getReturnValuesEvent(
     txReceipt: GetTransactionReceiptResponse,
     chain: ChainDocument,
