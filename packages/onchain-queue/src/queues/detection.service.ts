@@ -34,9 +34,21 @@ import {
   Wallets,
 } from '@app/shared/models';
 import { formattedContractAddress } from '@app/shared/utils';
+import TelegramBot from 'node-telegram-bot-api';
+import configuration from '@app/shared/configuration';
+import {
+  sendErc20BurnedMessage,
+  sendErc20MintedMessage,
+  sendErc20TransferedMessage,
+  sendNftBurnedMessage,
+  sendNftMintedMessage,
+  sendNftTransferedMessage,
+} from '@app/shared/messages';
 
 @Injectable()
 export class DetectionSerivce {
+  private bot: TelegramBot;
+
   constructor(
     @InjectModel(ContractDetails.name)
     private readonly contractDetailModel: Model<ContractDetailDocument>,
@@ -53,7 +65,11 @@ export class DetectionSerivce {
     @InjectQueue(QUEUE_METADATA)
     private readonly fetchMetadataQueue: Queue<string>,
     private readonly web3Service: Web3Service,
-  ) {}
+  ) {
+    this.bot = new TelegramBot(configuration().TELEGRAM_BOT_TOKEN, {
+      polling: true,
+    });
+  }
 
   logger = new Logger(DetectionSerivce.name);
 
@@ -233,7 +249,9 @@ export class DetectionSerivce {
     const { from, to, value, contractAddress, timestamp } =
       log.returnValues as ERC721OrERC20TransferReturnValue;
 
-    const toWallet = await this.walletModel.findOne({ address: to });
+    const toWallet = await this.walletModel
+      .findOne({ address: to })
+      .populate([{ path: 'chatId', select: ['chatId'] }]);
     if (!toWallet) return;
 
     const contractDetail = await this.getOrCreateContractDetail(
@@ -293,6 +311,16 @@ export class DetectionSerivce {
     this.logger.debug(
       `erc20 minted ${contractAddress}: ${value} ${from} -> ${to} - ${timestamp}`,
     );
+
+    await sendErc20MintedMessage(
+      this.bot,
+      toWallet.chatId.chatId,
+      to,
+      contractDetail.symbol,
+      value,
+      contractDetail.decimals,
+      log.transaction_hash,
+    );
   }
 
   async processErc20Burned(
@@ -303,7 +331,9 @@ export class DetectionSerivce {
     const { from, to, value, contractAddress, timestamp } =
       log.returnValues as ERC721OrERC20TransferReturnValue;
 
-    const fromWallet = await this.walletModel.findOne({ address: from });
+    const fromWallet = await this.walletModel
+      .findOne({ address: from })
+      .populate({ path: 'chatId', select: ['chatId'] });
     if (!fromWallet) return;
 
     const contractDetail = await this.getOrCreateContractDetail(
@@ -368,6 +398,16 @@ export class DetectionSerivce {
     this.logger.debug(
       `erc20 burned ${contractAddress}: ${value} ${from} -> ${to} - ${timestamp}`,
     );
+
+    sendErc20BurnedMessage(
+      this.bot,
+      fromWallet.chatId.chatId,
+      from,
+      contractDetail.symbol,
+      value,
+      contractDetail.decimals,
+      log.transaction_hash,
+    );
   }
 
   async processErc20Transfered(
@@ -378,8 +418,12 @@ export class DetectionSerivce {
     const { from, to, value, contractAddress, timestamp } =
       log.returnValues as ERC721OrERC20TransferReturnValue;
 
-    const fromWallet = await this.walletModel.findOne({ address: from });
-    const toWallet = await this.walletModel.findOne({ address: to });
+    const fromWallet = await this.walletModel
+      .findOne({ address: from })
+      .populate({ path: 'chatId', select: ['chatId'] });
+    const toWallet = await this.walletModel
+      .findOne({ address: to })
+      .populate({ path: 'chatId', select: ['chatId'] });
     if (!fromWallet && !toWallet) return;
 
     const contractDetail = await this.getOrCreateContractDetail(
@@ -418,6 +462,18 @@ export class DetectionSerivce {
           wallet: fromWallet._id,
         });
       }
+
+      sendErc20TransferedMessage(
+        this.bot,
+        fromWallet.chatId.chatId,
+        from,
+        false,
+        to,
+        contractDetail.symbol,
+        value,
+        contractDetail.decimals,
+        log.transaction_hash,
+      );
     }
 
     if (toWallet) {
@@ -449,6 +505,18 @@ export class DetectionSerivce {
           wallet: toWallet._id,
         });
       }
+
+      sendErc20TransferedMessage(
+        this.bot,
+        toWallet.chatId.chatId,
+        to,
+        true,
+        from,
+        contractDetail.symbol,
+        value,
+        contractDetail.decimals,
+        log.transaction_hash,
+      );
     }
 
     const transactionDetail: Transactions = {
@@ -491,7 +559,9 @@ export class DetectionSerivce {
       timestamp,
     } = log.returnValues as ERC721OrERC20TransferReturnValue;
 
-    const toUser = await this.walletModel.findOne({ address: to });
+    const toUser = await this.walletModel
+      .findOne({ address: to })
+      .populate([{ path: 'chatId', select: ['chatId'] }]);
     if (!toUser) return;
 
     const contractDetail = await this.getOrCreateContractDetail(
@@ -564,6 +634,16 @@ export class DetectionSerivce {
     this.logger.debug(
       `nft minted ${contractAddress}: ${tokenId} ${from} -> ${to} - ${timestamp}`,
     );
+
+    sendNftMintedMessage(
+      this.bot,
+      toUser.chatId.chatId,
+      to,
+      contractDetail.symbol,
+      tokenId,
+      '1',
+      log.transaction_hash,
+    );
   }
 
   async processNft721Burned(
@@ -579,7 +659,9 @@ export class DetectionSerivce {
       timestamp,
     } = log.returnValues as ERC721OrERC20TransferReturnValue;
 
-    const fromWallet = await this.walletModel.findOne({ address: from });
+    const fromWallet = await this.walletModel
+      .findOne({ address: from })
+      .populate([{ path: 'chatId', select: ['chatId'] }]);
     if (!fromWallet) return;
 
     const contractDetail = await this.getOrCreateContractDetail(
@@ -625,6 +707,16 @@ export class DetectionSerivce {
     this.logger.debug(
       `nft burned ${contractAddress}: ${tokenId} at - ${timestamp}`,
     );
+
+    sendNftBurnedMessage(
+      this.bot,
+      fromWallet.chatId.chatId,
+      from,
+      contractDetail.symbol,
+      tokenId,
+      '1',
+      log.transaction_hash,
+    );
   }
 
   async processNft721Transfered(
@@ -644,12 +736,12 @@ export class DetectionSerivce {
     const toWallet = await this.walletModel.findOne({ address: to });
     if (!fromWallet && !toWallet) return;
 
-    const nftCollection = await this.getOrCreateContractDetail(
+    const contractDetail = await this.getOrCreateContractDetail(
       contractAddress,
       chain,
     );
 
-    if (!nftCollection) return;
+    if (!contractDetail) return;
 
     const nftBalance = await this.nftBalanceModel.findOne({
       contractAddress,
@@ -667,7 +759,19 @@ export class DetectionSerivce {
           _id: nftBalance._id,
         });
       }
-    } else {
+
+      sendNftTransferedMessage(
+        this.bot,
+        fromWallet.chatId.chatId,
+        from,
+        false,
+        to,
+        contractDetail.symbol,
+        tokenId,
+        '1',
+        log.transaction_hash,
+      );
+    } else if (!nftBalance && toWallet) {
       const nftDetail = await this.getOrCreateNftDetail(
         contractAddress,
         tokenId,
@@ -691,6 +795,18 @@ export class DetectionSerivce {
         },
         { $set: newNftBalance },
         { new: true, upsert: true },
+      );
+
+      sendNftTransferedMessage(
+        this.bot,
+        toWallet.chatId.chatId,
+        to,
+        true,
+        from,
+        contractDetail.symbol,
+        tokenId,
+        '1',
+        log.transaction_hash,
       );
     }
 
@@ -730,7 +846,9 @@ export class DetectionSerivce {
     const { from, to, tokenId, nftAddress, timestamp, value } =
       log.returnValues as ERC1155TransferReturnValue;
 
-    const toWallet = await this.walletModel.findOne({ address: to });
+    const toWallet = await this.walletModel
+      .findOne({ address: to })
+      .populate([{ path: 'chatId', select: ['chatId'] }]);
     if (!toWallet) return;
 
     const contractDetail = await this.getOrCreateContractDetail(
@@ -800,6 +918,16 @@ export class DetectionSerivce {
     this.logger.debug(
       `${value} nft minted ${nftAddress}: ${tokenId} ${from} -> ${to} - ${timestamp}`,
     );
+
+    sendNftMintedMessage(
+      this.bot,
+      toWallet.chatId.chatId,
+      to,
+      contractDetail.symbol,
+      tokenId,
+      value,
+      log.transaction_hash,
+    );
   }
 
   async processNft1155Burned(
@@ -810,8 +938,9 @@ export class DetectionSerivce {
     const { from, to, tokenId, nftAddress, timestamp, value } =
       log.returnValues as ERC1155TransferReturnValue;
 
-    const fromWallet = await this.walletModel.findOne({ address: from });
-
+    const fromWallet = await this.walletModel
+      .findOne({ address: from })
+      .populate([{ path: 'chatId', select: ['chatId'] }]);
     if (!fromWallet) return;
 
     const contractDetail = await this.getOrCreateContractDetail(
@@ -881,6 +1010,16 @@ export class DetectionSerivce {
     this.logger.debug(
       `${value} nft burned ${nftAddress}: ${tokenId} ${from} -> ${to} - ${timestamp}`,
     );
+
+    sendNftBurnedMessage(
+      this.bot,
+      fromWallet.chatId.chatId,
+      from,
+      contractDetail.symbol,
+      tokenId,
+      value,
+      log.transaction_hash,
+    );
   }
 
   async processNft1155Transfered(
@@ -891,8 +1030,12 @@ export class DetectionSerivce {
     const { from, to, tokenId, nftAddress, timestamp, value } =
       log.returnValues as ERC1155TransferReturnValue;
 
-    const fromWallet = await this.walletModel.findOne({ address: from });
-    const toWallet = await this.walletModel.findOne({ address: to });
+    const fromWallet = await this.walletModel
+      .findOne({ address: from })
+      .populate([{ path: 'chatId', select: ['chatId'] }]);
+    const toWallet = await this.walletModel
+      .findOne({ address: to })
+      .populate([{ path: 'chatId', select: ['chatId'] }]);
     if (!fromWallet && !toWallet) return;
 
     const contractDetail = await this.getOrCreateContractDetail(
@@ -939,6 +1082,18 @@ export class DetectionSerivce {
           wallet: fromWallet._id,
         });
       }
+
+      sendNftTransferedMessage(
+        this.bot,
+        fromWallet.chatId.chatId,
+        from,
+        false,
+        to,
+        contractDetail.symbol,
+        tokenId,
+        value,
+        log.transaction_hash,
+      );
     }
 
     if (toWallet) {
@@ -973,6 +1128,18 @@ export class DetectionSerivce {
           wallet: toWallet._id,
         });
       }
+
+      sendNftTransferedMessage(
+        this.bot,
+        toWallet.chatId.chatId,
+        to,
+        true,
+        from,
+        contractDetail.symbol,
+        tokenId,
+        value,
+        log.transaction_hash,
+      );
     }
 
     const transactionDetail: Transactions = {
