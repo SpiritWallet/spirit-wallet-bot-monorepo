@@ -16,6 +16,9 @@ export enum UserState {
   AwaitingExportSeedPhrase = 'AwaitingExportSeedPhrase',
   AwaitingExportPrivateKey = 'AwaitingExportPrivateKey',
   AwaitingInvokeTransaction = 'AwaitingInvokeTransaction',
+  AwaitingRequireErc20Receiver = 'AwaitingRequireErc20Receiver',
+  AwaitingRequireErc20Amount = 'AwaitingRequireErc20Amount',
+  AwaitingConfirmTransaction = 'AwaitingConfirmTransaction',
 }
 
 export enum WalletAction {

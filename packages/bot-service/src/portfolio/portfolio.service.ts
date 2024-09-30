@@ -71,6 +71,44 @@ export class PortfolioService {
     return erc20Balances;
   }
 
+  async getWalletErc20Balance(
+    address: string,
+    contractAddress: string,
+  ): Promise<Erc20BalancesDto> {
+    const wallet = await this.walletModel.findOne({ address: address });
+
+    if (!wallet) {
+      return null;
+    }
+
+    const erc20Balance = await this.erc20BalanceModel.aggregate([
+      {
+        $match: {
+          wallet: wallet._id,
+          contractAddress: contractAddress,
+        },
+      },
+      {
+        $lookup: {
+          from: 'contractdetails',
+          localField: 'contractAddress',
+          foreignField: 'address',
+          as: 'contractDetail',
+        },
+      },
+      {
+        $unwind: {
+          path: '$contractDetail',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $limit: 1,
+      },
+    ]);
+    return erc20Balance[0];
+  }
+
   async getWalletNftBalances(address: string): Promise<NftBalancesDto[]> {
     const wallet = await this.walletModel.findOne({ address: address });
 
