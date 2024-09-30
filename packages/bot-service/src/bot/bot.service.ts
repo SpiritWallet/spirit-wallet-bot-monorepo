@@ -30,7 +30,12 @@ import {
   sendMissMatchSeedPhraseMessage,
 } from '@app/shared/messages';
 import { RedisService } from '../redis/redis.service';
-import { BotCommand, WalletAction, UserState } from '@app/shared/types';
+import {
+  BotCommand,
+  WalletAction,
+  UserState,
+  ContractStandard,
+} from '@app/shared/types';
 import {
   ChainDocument,
   Chains,
@@ -417,9 +422,17 @@ export class BotService {
             );
             break;
           case PORTFOLIO_CALLBACK_DATA_PREFIXS.NFT:
+            balances = await this.portfolioService.getWalletNftBalances(
+              decodeAddress(encodedAddress),
+            );
             break;
         }
-        await sendBalanceMessage(this.bot, callbackQuery, balances);
+        await sendBalanceMessage(
+          this.bot,
+          callbackQuery,
+          balances,
+          combinedPrefix,
+        );
         return;
       }
 

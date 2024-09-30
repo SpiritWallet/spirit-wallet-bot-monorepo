@@ -7,11 +7,13 @@ import {
   ContractDetailDocument,
   Erc20BalanceDocument,
   Erc20Balances,
+  NftBalanceDocument,
+  NftBalances,
   WalletDocument,
   Wallets,
 } from '@app/shared/models';
 import { COMMON_CONTRACT_ADDRESS } from '@app/shared/constants';
-import { Erc20BalancesDto } from '@app/shared/dto';
+import { Erc20BalancesDto, NftBalancesDto } from '@app/shared/dto';
 
 @Injectable()
 export class PortfolioService {
@@ -20,6 +22,8 @@ export class PortfolioService {
     private readonly walletModel: Model<WalletDocument>,
     @InjectModel(Erc20Balances.name)
     private readonly erc20BalanceModel: Model<Erc20BalanceDocument>,
+    @InjectModel(NftBalances.name)
+    private readonly nftBalanceModel: Model<NftBalanceDocument>,
   ) {}
 
   async getWalletErc20Balances(address: string): Promise<Erc20BalancesDto[]> {
@@ -65,5 +69,54 @@ export class PortfolioService {
       },
     ]);
     return erc20Balances;
+  }
+
+  async getWalletNftBalances(address: string): Promise<NftBalancesDto[]> {
+    const wallet = await this.walletModel.findOne({ address: address });
+
+    if (!wallet) {
+      return [];
+    }
+
+    const nftBalances = await this.nftBalanceModel.aggregate([
+      {
+        $match: {
+          wallet: wallet._id,
+        },
+      },
+      {
+        $lookup: {
+          from: 'nftdetails',
+          localField: 'nftDetail',
+          foreignField: '_id',
+          as: 'nftDetail',
+        },
+      },
+      {
+        $unwind: {
+          path: '$nftDetail',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $lookup: {
+          from: 'contractdetails',
+          localField: 'contractAddress',
+          foreignField: 'address',
+          as: 'contractDetail',
+        },
+      },
+      {
+        $unwind: {
+          path: '$contractDetail',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $limit: 100,
+      },
+    ]);
+
+    return nftBalances;
   }
 }

@@ -15,7 +15,7 @@ import {
 
 import TelegramBot from 'node-telegram-bot-api';
 import { formatUnits } from 'ethers';
-import { Erc20BalancesDto } from '../dto';
+import { Erc20BalancesDto, NftBalancesDto } from '../dto';
 import { shortenAddress, encodeAddress, decodeAddress } from '../utils';
 
 export const inlineFunctionsKeyboard = (encodedAddress: string) => {
@@ -237,13 +237,24 @@ export function sendPortfolioMessage(
 export async function sendBalanceMessage(
   bot: TelegramBot,
   callbackQuery: TelegramBot.CallbackQuery,
-  balances: Erc20BalancesDto[],
+  balances: (Erc20BalancesDto | NftBalancesDto)[],
+  combinedPrefix: string,
 ) {
   const [, , encodedAddress] = callbackQuery.data.split('_');
   const address = decodeAddress(encodedAddress);
   let baseMessage = `wallet address: ${'`'}${address}${'`'}.\n\nAsset List:\n`;
-  for (const balance of balances) {
-    baseMessage += `${balance.amount === '0' ? balance.amount : formatUnits(balance.amount, balance.contractDetail.decimals)} $${balance.contractDetail.symbol}\n`;
+  switch (combinedPrefix) {
+    case PORTFOLIO_CALLBACK_DATA_PREFIXS.ERC20_TOKENS:
+      for (const balance of balances) {
+        baseMessage += `${balance.amount === '0' ? balance.amount : formatUnits(balance.amount, balance.contractDetail.decimals)} $${balance.contractDetail.symbol}\n`;
+      }
+      break;
+    case PORTFOLIO_CALLBACK_DATA_PREFIXS.NFT:
+      for (const balance of balances as NftBalancesDto[]) {
+        baseMessage += `${balance.amount} ${balance.nftDetail.name} (tokenID ${balance.tokenId}) of [${balance.contractDetail.name}](https://starkscan.co/nft-contract/${balance.contractAddress}) collection\n`;
+      }
+
+      break;
   }
 
   bot.editMessageText(baseMessage, {
@@ -251,6 +262,7 @@ export async function sendBalanceMessage(
     message_id: callbackQuery.message.message_id,
     parse_mode: 'Markdown',
     reply_markup: inlineBalancesKeyboard(encodedAddress),
+    disable_web_page_preview: true,
   });
 }
 
