@@ -28,7 +28,7 @@ import {
   decodeERC721OrERC20Transfer,
 } from './decodeEvent';
 import { ABIS } from './abi';
-import { attemptOperations } from '@app/shared/utils/promise';
+import { attemptOperations, delay } from '@app/shared/utils/promise';
 
 @Injectable()
 export class Web3Service {
@@ -62,12 +62,8 @@ export class Web3Service {
     return contractInstance;
   }
 
-  async getAccountInstance(address: string, privateKey: string, rpc?: string) {
-    if (!rpc) {
-      const chain = await this.chainModel.findOne();
-      rpc = chain.rpc;
-    }
-    const provider = await this.getProvider(rpc);
+  getAccountInstance(address: string, privateKey: string, rpc: string) {
+    const provider = this.getProvider(rpc);
     const account = new Account(provider, address, privateKey, '1', '0x2');
     return account;
   }
@@ -186,6 +182,7 @@ export class Web3Service {
     const provider = this.getProvider(rpc);
     let isFinished = false;
     let isSuccess = false;
+    await provider.waitForTransaction(txHash);
     while (!isFinished) {
       const tx = await provider.getTransactionReceipt(txHash);
       if (tx) {
@@ -195,6 +192,8 @@ export class Web3Service {
 
         isFinished = true;
       }
+
+      await delay(5);
     }
 
     return { isSuccess };

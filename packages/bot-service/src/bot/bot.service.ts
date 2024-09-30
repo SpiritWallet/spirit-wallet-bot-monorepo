@@ -28,17 +28,22 @@ import {
   sendRequireSeedPhraseMessage,
   sendResetPasswordSuccessMessage,
   sendMissMatchSeedPhraseMessage,
+  sendErc20DetailMessage,
+  sendRequireErc20ReceiverMessage,
+  sendInvalidReceiverMessage,
+  sendRequireErc20AmountMessage,
+  sendInsufficientErc20BalanceErrorMessage,
+  sendConfirmTransactionMessage,
+  sendNotDeployedWalletMessage,
+  sendInvalidAmountMessage,
+  sendAwaitForInvolkTransactionMessage,
 } from '@app/shared/messages';
 import { RedisService } from '../redis/redis.service';
-import {
-  BotCommand,
-  WalletAction,
-  UserState,
-  ContractStandard,
-} from '@app/shared/types';
+import { BotCommand, WalletAction, UserState } from '@app/shared/types';
 import {
   ChainDocument,
   Chains,
+  ContractDetails,
   Erc20BalanceDocument,
   Erc20Balances,
   UserDocument,
@@ -51,18 +56,22 @@ import { InjectModel } from '@nestjs/mongoose';
 import {
   COMMAND_CALLBACK_DATA_PREFIXS,
   COMMON_CONTRACT_ADDRESS,
+  CONFIRM_TRANSACTION_CALLBACK_DATA_PREFIXS,
   FUNCTIONS_CALLBACK_DATA_PREFIXS,
   PORTFOLIO_CALLBACK_DATA_PREFIXS,
   SECURITY_AND_PRIVACY_CALLBACK_DATA_PREFIXS,
   SPECIAL_PREFIXS,
   TURN_BACK_CALLBACK_DATA_KEYS,
+  VIEW_TOKEN_CALLBACK_DATA_PREFIXS,
 } from '@app/shared/constants';
 import { PortfolioService } from '../portfolio/portfolio.service';
 import { Erc20BalancesDto } from '@app/shared/dto';
 import {
   decodeAddress,
   decryptWithPBEAndSecret,
+  encodeAddress,
   encryptSeedPhrase,
+  formattedContractAddress,
   generateSeedPhrase,
   getStarkPk,
   getWalletAddress,
@@ -72,6 +81,10 @@ import {
   verifyPassword,
 } from '@app/shared/utils';
 import { WalletService } from '../wallet/wallet.service';
+import { isHexadecimal, isNumberString } from 'class-validator';
+import { formatUnits } from 'ethers';
+import { Web3Service } from '@app/web3/web3.service';
+import { CallData, uint256 } from 'starknet';
 
 @Injectable()
 export class BotService {
@@ -84,9 +97,12 @@ export class BotService {
     private readonly walletModel: Model<WalletDocument>,
     @InjectModel(Erc20Balances.name)
     private readonly erc20BalanceModel: Model<Erc20BalanceDocument>,
+    @InjectModel(ContractDetails.name)
+    private readonly contractDetailModel: Model<ContractDetails>,
     private readonly redisService: RedisService,
     private readonly portfolioService: PortfolioService,
     private readonly walletService: WalletService,
+    private readonly web3Service: Web3Service,
   ) {
     this.bot = new TelegramBot(configuration().TELEGRAM_BOT_TOKEN, {
       polling: true,
@@ -329,11 +345,75 @@ export class BotService {
           // delete the state
           await this.redisService.del(`user:${chatId}:state`);
           // send a private key message to the user
-          const [, encodedAddress] = state.split(
+          const [, context] = state.split(
             UserState.AwaitingInvokeTransaction + '_',
           );
-          this.handleInvokeTransactionCommand(msg, user, encodedAddress);
+          this.handleInvokeTransactionCommand(msg, user, context);
         }
+      }
+
+      if (state.startsWith(UserState.AwaitingRequireErc20Receiver)) {
+        const isValidReceiver = isHexadecimal(message);
+        const stringifiedContext = state.replace(
+          UserState.AwaitingRequireErc20Receiver + '_',
+          '',
+        );
+        const context = JSON.parse(stringifiedContext);
+        if (!isValidReceiver) {
+          sendInvalidReceiverMessage(
+            this.bot,
+            msg,
+            encodeAddress(context.wallet.address),
+          );
+          return;
+        }
+
+        // delete the state
+        await this.redisService.del(`user:${chatId}:state`);
+        await this.handleRequireErc20Amount(msg, message, stringifiedContext);
+      }
+
+      if (state.startsWith(UserState.AwaitingRequireErc20Amount)) {
+        const stringifiedContext = state.replace(
+          UserState.AwaitingRequireErc20Amount + '_',
+          '',
+        );
+
+        if (!isNumberString(message)) {
+          sendInvalidAmountMessage(this.bot, msg);
+          return;
+        }
+        const context = JSON.parse(stringifiedContext);
+
+        const balance = await this.portfolioService.getWalletErc20Balance(
+          context.wallet.address,
+          context.contractDetail.address,
+        );
+
+        if (
+          Number(formatUnits(balance.amount, balance.contractDetail.decimals)) <
+          Number(message)
+        ) {
+          sendInsufficientErc20BalanceErrorMessage(
+            this.bot,
+            msg,
+            encodeAddress(context.wallet.address),
+          );
+          return;
+        }
+
+        // delete the state
+        await this.redisService.del(`user:${chatId}:state`);
+
+        context.amount = message;
+        // require password
+        await this.requirePassword(
+          msg,
+          UserState.AwaitingInvokeTransaction +
+            '_' +
+            FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER +
+            JSON.stringify(context),
+        );
       }
     });
   }
@@ -427,13 +507,95 @@ export class BotService {
             );
             break;
         }
+
+        const wallet = await this.walletModel.findOne({
+          address: decodeAddress(encodedAddress),
+        });
         await sendBalanceMessage(
           this.bot,
           callbackQuery,
+          wallet.index,
           balances,
           combinedPrefix,
         );
         return;
+      }
+
+      if (data.startsWith(VIEW_TOKEN_CALLBACK_DATA_PREFIXS.ERC20_TOKENS)) {
+        const conbinedData = data.replace(
+          VIEW_TOKEN_CALLBACK_DATA_PREFIXS.ERC20_TOKENS,
+          '',
+        );
+        const [encodedContractAddress, walletIndex] = conbinedData.split('_');
+        const user = await this.userModel.findOne({
+          chatId: callbackQuery.message.chat.id,
+        });
+        const wallet = await this.walletModel.findOne({
+          chatId: user._id,
+          index: walletIndex,
+        });
+        const balance = await this.portfolioService.getWalletErc20Balance(
+          wallet.address,
+          decodeAddress(encodedContractAddress),
+        );
+
+        sendErc20DetailMessage(this.bot, callbackQuery, wallet, balance);
+      }
+
+      if (data.startsWith(SPECIAL_PREFIXS.TRANSFER)) {
+        const conbinedData = data.replace(SPECIAL_PREFIXS.TRANSFER, '');
+        const [type, encodedContractAddress, walletIndex] =
+          conbinedData.split('_');
+        const user = await this.userModel.findOne({
+          chatId: callbackQuery.message.chat.id,
+        });
+        const wallet = await this.walletModel.findOne({
+          chatId: user._id,
+          index: walletIndex,
+        });
+
+        if (!wallet.isDeployed) {
+          sendNotDeployedWalletMessage(
+            this.bot,
+            callbackQuery.message,
+            encodeAddress(wallet.address),
+          );
+          return;
+        }
+
+        if (type === 'erc20') {
+          await this.handleRequireErc20Receiver(
+            callbackQuery.message,
+            user,
+            wallet,
+            decodeAddress(encodedContractAddress),
+          );
+        }
+      }
+
+      if (data === CONFIRM_TRANSACTION_CALLBACK_DATA_PREFIXS) {
+        const data = await this.redisService.get(
+          `user:${callbackQuery.message.chat.id}:state`,
+        );
+
+        if (!data) return;
+
+        const stringifiedTransferDetail = data.replace(
+          UserState.AwaitingConfirmTransaction + '_',
+          '',
+        );
+        try {
+          sendAwaitForInvolkTransactionMessage(this.bot, callbackQuery.message);
+          await this.walletService.handleTransferErc20(
+            this.bot,
+            callbackQuery.message,
+            stringifiedTransferDetail,
+          );
+        } catch (error) {
+          console.log(error);
+
+          sendErrorMessage(this.bot, callbackQuery.message);
+        }
       }
 
       // execute security and privacy function
@@ -756,19 +918,125 @@ export class BotService {
     sendPrivateKeyMessage(this.bot, msg, privateKey);
   }
 
+  private async handleRequireErc20Receiver(
+    msg: TelegramBot.Message,
+    userDocument: UserDocument,
+    wallet: WalletDocument,
+    contractAddress: string,
+  ) {
+    sendRequireErc20ReceiverMessage(this.bot, msg);
+
+    const contractDetail = await this.contractDetailModel.findOne({
+      address: contractAddress,
+    });
+
+    const transferDetail = {
+      userDocument,
+      wallet,
+      contractDetail,
+    };
+
+    const combinedValue =
+      UserState.AwaitingRequireErc20Receiver +
+      '_' +
+      JSON.stringify(transferDetail);
+
+    await this.redisService.set(`user:${msg.chat.id}:state`, combinedValue);
+  }
+
+  private async handleRequireErc20Amount(
+    msg: TelegramBot.Message,
+    receiver: string,
+    context: string,
+  ) {
+    sendRequireErc20AmountMessage(this.bot, msg);
+
+    const transferDetail = JSON.parse(context);
+    transferDetail.receiver = formattedContractAddress(receiver);
+
+    const combinedValue =
+      UserState.AwaitingRequireErc20Amount +
+      '_' +
+      JSON.stringify(transferDetail);
+    await this.redisService.set(`user:${msg.chat.id}:state`, combinedValue);
+  }
+
+  private async handleRequireConfirmTransaction(
+    msg: TelegramBot.Message,
+    context: string,
+  ) {
+    const transferDetail = JSON.parse(context);
+    const password = msg.text;
+    const { wallet, contractDetail, userDocument, receiver } = transferDetail;
+
+    const { seedPhrase: encryptedSeedPhrase, iv, salt } = userDocument;
+    const seedPhrase = await decryptWithPBEAndSecret(
+      encryptedSeedPhrase,
+      password,
+      iv,
+      salt,
+    );
+
+    const privateKey = getStarkPk(seedPhrase, wallet.index);
+    const chainDocument = await this.chainModel.findOne();
+    const account = this.web3Service.getAccountInstance(
+      wallet.address,
+      privateKey,
+      chainDocument.rpc,
+    );
+
+    let estimatedFee;
+    try {
+      estimatedFee = await account.estimateFee([
+        {
+          contractAddress: contractDetail.address,
+          entrypoint: 'transfer',
+          calldata: CallData.compile({
+            recipient: receiver,
+            amount: uint256.bnToUint256('1'),
+          }),
+        },
+      ]);
+    } catch (error) {
+      console.log(error);
+
+      sendErrorMessage(this.bot, msg);
+      return;
+    }
+
+    transferDetail.estimatedFee = estimatedFee.suggestedMaxFee.toString();
+    transferDetail.wallet.privateKey = privateKey;
+
+    sendConfirmTransactionMessage(
+      this.bot,
+      msg,
+      context,
+      estimatedFee.suggestedMaxFee.toString(),
+    );
+
+    const combinedValue =
+      UserState.AwaitingConfirmTransaction +
+      '_' +
+      JSON.stringify(transferDetail);
+    await this.redisService.set(`user:${msg.chat.id}:state`, combinedValue);
+  }
+
   private async handleInvokeTransactionCommand(
     msg: TelegramBot.Message,
     userDocument: UserDocument,
     context: string,
   ) {
-    const [fnPrefix, functionName, encodedAddress] = context.split('_');
+    const [fnPrefix, functionName] = context.split('_');
     const combinedPrefix = fnPrefix + '_' + functionName + '_';
-    const address = decodeAddress(encodedAddress);
 
     let txHash: string = null;
     try {
       switch (combinedPrefix) {
         case FUNCTIONS_CALLBACK_DATA_PREFIXS.DEPLOY_WALLET:
+          const address = decodeAddress(
+            context.replace(FUNCTIONS_CALLBACK_DATA_PREFIXS.DEPLOY_WALLET, ''),
+          );
+
           txHash = await this.walletService.handleDeployWallet(
             this.bot,
             msg,
@@ -777,13 +1045,18 @@ export class BotService {
           );
           break;
         case FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER:
+          // send Confirm Transaction message
+          await this.handleRequireConfirmTransaction(
+            msg,
+            context.replace(FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER, ''),
+          );
           break;
         case FUNCTIONS_CALLBACK_DATA_PREFIXS.BULK_TRANSFER:
           break;
       }
     } catch (error) {
       console.log(error);
-      sendErrorMessage(this.bot, msg, error);
+      sendErrorMessage(this.bot, msg);
     }
   }
 }

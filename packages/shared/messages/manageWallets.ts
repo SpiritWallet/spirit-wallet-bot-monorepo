@@ -6,12 +6,9 @@ import {
   PORTFOLIO_CALLBACK_DATA_PREFIXS,
   SECURITY_AND_PRIVACY_CALLBACK_DATA_PREFIXS,
   TURN_BACK_CALLBACK_DATA_KEYS,
+  VIEW_TOKEN_CALLBACK_DATA_PREFIXS,
 } from '../constants';
-import {
-  Erc20BalanceDocument,
-  NftBalanceDocument,
-  WalletDocument,
-} from '../models';
+import { WalletDocument } from '../models';
 
 import TelegramBot from 'node-telegram-bot-api';
 import { formatUnits } from 'ethers';
@@ -33,16 +30,6 @@ export const inlineFunctionsKeyboard = (encodedAddress: string) => {
           text: 'Portfolio',
           callback_data:
             FUNCTIONS_CALLBACK_DATA_PREFIXS.PORTFOLIO + encodedAddress,
-        },
-        {
-          text: 'Transfer',
-          callback_data:
-            FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER + encodedAddress,
-        },
-        {
-          text: 'Bulk Transfer',
-          callback_data:
-            FUNCTIONS_CALLBACK_DATA_PREFIXS.BULK_TRANSFER + encodedAddress,
         },
       ],
       [
@@ -90,29 +77,15 @@ export const inlinePortfolioKeyboard = (encodedAddress: string) => {
 };
 
 export const inlineBalancesKeyboard = (encodedAddress: string) => {
-  return {
-    inline_keyboard: [
-      [
-        {
-          text: 'Transfer',
-          callback_data:
-            FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER + encodedAddress,
-        },
-        {
-          text: 'Bulk Transfer',
-          callback_data:
-            FUNCTIONS_CALLBACK_DATA_PREFIXS.BULK_TRANSFER + encodedAddress,
-        },
-      ],
-      [
-        {
-          text: 'Back to Portfolio',
-          callback_data:
-            TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_PORTFOLIO + encodedAddress,
-        },
-      ],
+  return [
+    [
+      {
+        text: 'Back to Portfolio',
+        callback_data:
+          TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_PORTFOLIO + encodedAddress,
+      },
     ],
-  };
+  ];
 };
 
 export const inlineSecurityAndPrivacyKeyboard = (encodedAddress: string) => {
@@ -237,16 +210,27 @@ export function sendPortfolioMessage(
 export async function sendBalanceMessage(
   bot: TelegramBot,
   callbackQuery: TelegramBot.CallbackQuery,
+  walletIndex: number,
   balances: (Erc20BalancesDto | NftBalancesDto)[],
   combinedPrefix: string,
 ) {
   const [, , encodedAddress] = callbackQuery.data.split('_');
   const address = decodeAddress(encodedAddress);
   let baseMessage = `wallet address: ${'`'}${address}${'`'}.\n\nAsset List:\n`;
+  const inlineKeyboard: TelegramBot.InlineKeyboardButton[] = [];
+
   switch (combinedPrefix) {
     case PORTFOLIO_CALLBACK_DATA_PREFIXS.ERC20_TOKENS:
       for (const balance of balances) {
         baseMessage += `${balance.amount === '0' ? balance.amount : formatUnits(balance.amount, balance.contractDetail.decimals)} $${balance.contractDetail.symbol}\n`;
+        inlineKeyboard.push({
+          text: balance.contractDetail.symbol,
+          callback_data:
+            VIEW_TOKEN_CALLBACK_DATA_PREFIXS.ERC20_TOKENS +
+            encodeAddress(balance.contractAddress) +
+            '_' +
+            walletIndex,
+        });
       }
       break;
     case PORTFOLIO_CALLBACK_DATA_PREFIXS.NFT:
@@ -261,7 +245,12 @@ export async function sendBalanceMessage(
     chat_id: callbackQuery.message.chat.id,
     message_id: callbackQuery.message.message_id,
     parse_mode: 'Markdown',
-    reply_markup: inlineBalancesKeyboard(encodedAddress),
+    reply_markup: {
+      inline_keyboard: [
+        inlineKeyboard,
+        ...inlineBalancesKeyboard(encodedAddress),
+      ],
+    },
     disable_web_page_preview: true,
   });
 }
@@ -347,6 +336,7 @@ export function sendAlreadyDeployedWalletMessage(
         ],
       ],
     },
+    disable_web_page_preview: true,
   });
 }
 
@@ -371,5 +361,67 @@ export function sendDeployWalletSuccessMessage(
         ],
       ],
     },
+  });
+}
+
+export function sendInvolkeTransactionSuccessMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+  txHash: string,
+  encodedAddress: string,
+) {
+  const message = `Your transaction has been successfully invoked!\n\nHere is your transaction hash: [${txHash}](https://sepolia.starkscan.co/tx/${txHash}).`;
+
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: 'Back to wallet functions',
+            callback_data:
+              TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLET_FUNCTIONS +
+              encodedAddress,
+          },
+        ],
+      ],
+    },
+    disable_web_page_preview: true,
+  });
+}
+
+export function sendNotDeployedWalletMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+  encodedAddress: string,
+) {
+  const message = `Your wallet is not deployed yet!
+  \n\nPlease deploy your wallet first.`;
+
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: 'Back to wallet functions',
+            callback_data:
+              TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLET_FUNCTIONS +
+              encodedAddress,
+          },
+        ],
+      ],
+    },
+  });
+}
+
+export function sendAwaitForInvolkTransactionMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+) {
+  const message = `Please wait for your transaction to be invoked.`;
+
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
   });
 }

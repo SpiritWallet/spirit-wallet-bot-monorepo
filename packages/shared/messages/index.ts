@@ -6,3 +6,4 @@ export * from './manageWallets';
 export * from './password';
 export * from './error';
 export * from './onchain';
+export * from './contractDetail';

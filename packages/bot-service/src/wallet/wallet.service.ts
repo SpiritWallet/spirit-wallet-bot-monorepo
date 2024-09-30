@@ -5,13 +5,15 @@ import TelegramBot from 'node-telegram-bot-api';
 import {
   COMMON_CONTRACT_ADDRESS,
   FUNCTIONS_CALLBACK_DATA_PREFIXS,
-  TURN_BACK_CALLBACK_DATA_KEYS,
 } from '@app/shared/constants';
 import {
   sendAlreadyDeployedWalletMessage,
   sendDeployWalletFailedErrorMessage,
   sendDeployWalletSuccessMessage,
+  sendErrorMessage,
   sendInsufficientBalanceErrorMessage,
+  sendInvolkeTransactionFailedErrorMessage,
+  sendInvolkeTransactionSuccessMessage,
   sendNoWalletMessage,
   sendPortfolioMessage,
   sendSecurityAndPrivacyMessage,
@@ -24,6 +26,8 @@ import {
   UserDocument,
   Erc20Balances,
   Erc20BalanceDocument,
+  Chains,
+  ChainDocument,
 } from '@app/shared/models';
 import {
   encodeAddress,
@@ -31,6 +35,8 @@ import {
   getStarkPk,
 } from '@app/shared/utils';
 import { Web3Service } from '@app/web3/web3.service';
+import { CallData, uint256 } from 'starknet';
+import { parseUnits } from 'ethers';
 
 @Injectable()
 export class WalletService {
@@ -39,6 +45,8 @@ export class WalletService {
     private readonly walletModel: Model<WalletDocument>,
     @InjectModel(Erc20Balances.name)
     private readonly erc20BalanceModel: Model<Erc20BalanceDocument>,
+    @InjectModel(Chains.name)
+    private readonly chainModel: Model<ChainDocument>,
     private readonly web3Service: Web3Service,
   ) {}
 
@@ -47,7 +55,7 @@ export class WalletService {
     callbackQuery: TelegramBot.CallbackQuery,
   ): boolean {
     const data = callbackQuery.data;
-    const [fnPrefix, functionName, encodedAddress] = data.split('_');
+    const [fnPrefix, functionName] = data.split('_');
     const combinedPrefix = fnPrefix + '_' + functionName + '_';
 
     let isRequirePassword = false;
@@ -59,10 +67,8 @@ export class WalletService {
         sendPortfolioMessage(bot, callbackQuery);
         break;
       case FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER:
-        isRequirePassword = true;
         break;
       case FUNCTIONS_CALLBACK_DATA_PREFIXS.BULK_TRANSFER:
-        isRequirePassword = true;
         break;
       case FUNCTIONS_CALLBACK_DATA_PREFIXS.SECURITY_AND_PRIVACY:
         sendSecurityAndPrivacyMessage(bot, callbackQuery);
@@ -151,6 +157,62 @@ export class WalletService {
     );
 
     sendDeployWalletSuccessMessage(bot, msg, txHash, encodeAddress(address));
+    return txHash;
+  }
+
+  async handleTransferErc20(
+    bot: TelegramBot,
+    msg: TelegramBot.Message,
+    context: string,
+  ): Promise<string> {
+    const transferDetail = JSON.parse(context);
+    const { wallet, contractDetail, receiver } = transferDetail;
+
+    const chainDocument = await this.chainModel.findOne();
+    const account = this.web3Service.getAccountInstance(
+      wallet.address,
+      wallet.privateKey,
+      chainDocument.rpc,
+    );
+
+    const { transaction_hash: txHash } = await account.execute([
+      {
+        contractAddress: contractDetail.address,
+        entrypoint: 'transfer',
+        calldata: CallData.compile({
+          recipient: receiver,
+          amount: uint256.bnToUint256(
+            Number(
+              parseUnits(
+                transferDetail.amount,
+                transferDetail.contractDetail.decimals,
+              ),
+            ) - Number(transferDetail.estimatedFee),
+          ),
+        }),
+      },
+    ]);
+
+    await this.web3Service.awaitTransaction(txHash);
+    const isSuccess = await this.web3Service.awaitTransaction(txHash);
+
+    if (!isSuccess.isSuccess) {
+      sendInvolkeTransactionFailedErrorMessage(
+        bot,
+        msg,
+        txHash,
+        encodeAddress(wallet.address),
+      );
+      return null;
+    }
+
+    sendInvolkeTransactionSuccessMessage(
+      bot,
+      msg,
+      txHash,
+      encodeAddress(wallet.address),
+    );
+
     return txHash;
   }
 }
