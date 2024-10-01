@@ -37,9 +37,18 @@ import {
   sendNotDeployedWalletMessage,
   sendInvalidAmountMessage,
   sendAwaitForInvolkTransactionMessage,
+  sendNftDetailMessage,
+  sendRequireNftReceiverMessage,
+  sendInsufficientBalanceErrorMessage,
+  sendInsufficientNftBalanceErrorMessage,
 } from '@app/shared/messages';
 import { RedisService } from '../redis/redis.service';
-import { BotCommand, WalletAction, UserState } from '@app/shared/types';
+import {
+  BotCommand,
+  WalletAction,
+  UserState,
+  ContractStandard,
+} from '@app/shared/types';
 import {
   ChainDocument,
   Chains,
@@ -62,7 +71,6 @@ import {
   SECURITY_AND_PRIVACY_CALLBACK_DATA_PREFIXS,
   SPECIAL_PREFIXS,
   TURN_BACK_CALLBACK_DATA_KEYS,
-  VIEW_TOKEN_CALLBACK_DATA_PREFIXS,
 } from '@app/shared/constants';
 import { PortfolioService } from '../portfolio/portfolio.service';
 import { Erc20BalancesDto } from '@app/shared/dto';
@@ -82,9 +90,9 @@ import {
 } from '@app/shared/utils';
 import { WalletService } from '../wallet/wallet.service';
 import { isHexadecimal, isNumberString } from 'class-validator';
-import { formatUnits } from 'ethers';
+import { formatUnits, parseUnits } from 'ethers';
 import { Web3Service } from '@app/web3/web3.service';
-import { CallData, uint256 } from 'starknet';
+import { CallData, uint256, EstimateFee } from 'starknet';
 
 @Injectable()
 export class BotService {
@@ -388,6 +396,7 @@ export class BotService {
         const balance = await this.portfolioService.getWalletErc20Balance(
           context.wallet.address,
           context.contractDetail.address,
+          context.wallet,
         );
 
         if (
@@ -395,6 +404,82 @@ export class BotService {
           Number(message)
         ) {
           sendInsufficientErc20BalanceErrorMessage(
+            this.bot,
+            msg,
+            encodeAddress(context.wallet.address),
+          );
+          return;
+        }
+
+        // delete the state
+        await this.redisService.del(`user:${chatId}:state`);
+
+        context.amount = message;
+        // require password
+        await this.requirePassword(
+          msg,
+          UserState.AwaitingInvokeTransaction +
+            '_' +
+            FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER +
+            JSON.stringify(context),
+        );
+      }
+
+      if (state.startsWith(UserState.AwaitingRequireNftReceiver)) {
+        const isValidReceiver = isHexadecimal(message);
+        const stringifiedContext = state.replace(
+          UserState.AwaitingRequireNftReceiver + '_',
+          '',
+        );
+        const context = JSON.parse(stringifiedContext);
+
+        if (!isValidReceiver) {
+          sendInvalidReceiverMessage(
+            this.bot,
+            msg,
+            encodeAddress(context.wallet.address),
+          );
+          return;
+        }
+        // delete the state
+        await this.redisService.del(`user:${chatId}:state`);
+
+        context.receiver = formattedContractAddress(message);
+        if (context.contractDetail.standard === ContractStandard.ERC1155) {
+          await this.handleRequireNftAmount(msg, JSON.stringify(context));
+        } else {
+          context.amount = '1';
+          await this.requirePassword(
+            msg,
+            UserState.AwaitingInvokeTransaction +
+              '_' +
+              FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER +
+              JSON.stringify(context),
+          );
+        }
+      }
+
+      if (state.startsWith(UserState.AwaitingRequireNftAmount)) {
+        const stringifiedContext = state.replace(
+          UserState.AwaitingRequireNftAmount + '_',
+          '',
+        );
+
+        if (!isNumberString(message)) {
+          sendInvalidAmountMessage(this.bot, msg);
+          return;
+        }
+        const context = JSON.parse(stringifiedContext);
+        const [wallet, contractDetail, tokenId] = context;
+
+        const balance = await this.portfolioService.getWalletNftBalance(
+          wallet.address,
+          contractDetail.address,
+          tokenId,
+        );
+
+        if (Number(balance.amount) < Number(message)) {
+          sendInsufficientNftBalanceErrorMessage(
             this.bot,
             msg,
             encodeAddress(context.wallet.address),
@@ -521,12 +606,11 @@ export class BotService {
         return;
       }
 
-      if (data.startsWith(VIEW_TOKEN_CALLBACK_DATA_PREFIXS.ERC20_TOKENS)) {
-        const conbinedData = data.replace(
-          VIEW_TOKEN_CALLBACK_DATA_PREFIXS.ERC20_TOKENS,
-          '',
-        );
-        const [encodedContractAddress, walletIndex] = conbinedData.split('_');
+      if (data.startsWith(SPECIAL_PREFIXS.VIEW_TOKEN)) {
+        const remainningData = data.replace(SPECIAL_PREFIXS.VIEW_TOKEN, '');
+        const [type, encodedContractAddress, walletIndex] =
+          remainningData.split('_');
+
         const user = await this.userModel.findOne({
           chatId: callbackQuery.message.chat.id,
         });
@@ -534,12 +618,26 @@ export class BotService {
           chatId: user._id,
           index: walletIndex,
         });
-        const balance = await this.portfolioService.getWalletErc20Balance(
-          wallet.address,
-          decodeAddress(encodedContractAddress),
-        );
+        if (type === 'erc20') {
+          const balance = await this.portfolioService.getWalletErc20Balance(
+            wallet.address,
+            decodeAddress(encodedContractAddress),
+            wallet,
+          );
 
-        sendErc20DetailMessage(this.bot, callbackQuery, wallet, balance);
+          sendErc20DetailMessage(this.bot, callbackQuery, wallet, balance);
+        } else if (type === 'nft') {
+          const [, encodedContractAddress, , tokenId] =
+            remainningData.split('_');
+          const nftBalance = await this.portfolioService.getWalletNftBalance(
+            wallet.address,
+            decodeAddress(encodedContractAddress),
+            tokenId,
+            wallet,
+          );
+
+          sendNftDetailMessage(this.bot, callbackQuery, wallet, nftBalance);
+        }
       }
 
       if (data.startsWith(SPECIAL_PREFIXS.TRANSFER)) {
@@ -570,6 +668,15 @@ export class BotService {
             wallet,
             decodeAddress(encodedContractAddress),
           );
+        } else if (type === 'nft') {
+          const [, , , tokenId] = conbinedData.split('_');
+          await this.handleRequireNftReceiver(
+            callbackQuery.message,
+            user,
+            wallet,
+            decodeAddress(encodedContractAddress),
+            tokenId,
+          );
         }
       }
 
@@ -584,13 +691,29 @@ export class BotService {
           UserState.AwaitingConfirmTransaction + '_',
           '',
         );
+
+        // await this.redisService.del(
+        //   `user:${callbackQuery.message.chat.id}:state`,
+        // );
         try {
           sendAwaitForInvolkTransactionMessage(this.bot, callbackQuery.message);
-          await this.walletService.handleTransferErc20(
-            this.bot,
-            callbackQuery.message,
-            stringifiedTransferDetail,
-          );
+
+          const transferDetail = JSON.parse(stringifiedTransferDetail);
+          if (
+            transferDetail.contractDetail.standard === ContractStandard.ERC20
+          ) {
+            await this.walletService.handleTransferErc20(
+              this.bot,
+              callbackQuery.message,
+              stringifiedTransferDetail,
+            );
+          } else {
+            await this.walletService.handleTransferNft(
+              this.bot,
+              callbackQuery.message,
+              stringifiedTransferDetail,
+            );
+          }
         } catch (error) {
           console.log(error);
 
@@ -944,6 +1067,33 @@ export class BotService {
     await this.redisService.set(`user:${msg.chat.id}:state`, combinedValue);
   }
 
+  private async handleRequireNftReceiver(
+    msg: TelegramBot.Message,
+    userDocument: UserDocument,
+    wallet: WalletDocument,
+    contractAddress: string,
+    tokenId: string,
+  ) {
+    sendRequireNftReceiverMessage(this.bot, msg);
+
+    const contractDetail = await this.contractDetailModel.findOne({
+      address: contractAddress,
+    });
+
+    const transferDetail = {
+      userDocument,
+      wallet,
+      contractDetail,
+      tokenId,
+    };
+
+    const combinedValue =
+      UserState.AwaitingRequireNftReceiver +
+      '_' +
+      JSON.stringify(transferDetail);
+    await this.redisService.set(`user:${msg.chat.id}:state`, combinedValue);
+  }
+
   private async handleRequireErc20Amount(
     msg: TelegramBot.Message,
     receiver: string,
@@ -958,6 +1108,17 @@ export class BotService {
       UserState.AwaitingRequireErc20Amount +
       '_' +
       JSON.stringify(transferDetail);
+    await this.redisService.set(`user:${msg.chat.id}:state`, combinedValue);
+  }
+
+  private async handleRequireNftAmount(
+    msg: TelegramBot.Message,
+    context: string,
+  ) {
+    const transferDetail = JSON.parse(context);
+
+    const combinedValue =
+      UserState.AwaitingRequireNftAmount + '_' + JSON.stringify(transferDetail);
     await this.redisService.set(`user:${msg.chat.id}:state`, combinedValue);
   }
 
@@ -985,18 +1146,80 @@ export class BotService {
       chainDocument.rpc,
     );
 
-    let estimatedFee;
+    let estimatedFee: EstimateFee;
     try {
-      estimatedFee = await account.estimateFee([
-        {
-          contractAddress: contractDetail.address,
-          entrypoint: 'transfer',
-          calldata: CallData.compile({
-            recipient: receiver,
-            amount: uint256.bnToUint256('1'),
-          }),
-        },
-      ]);
+      switch (contractDetail.standard) {
+        case ContractStandard.ERC20:
+          estimatedFee = await account.estimateFee([
+            {
+              contractAddress: contractDetail.address,
+              entrypoint: 'transfer',
+              calldata: CallData.compile({
+                recipient: receiver,
+                amount: uint256.bnToUint256('1'),
+              }),
+            },
+          ]);
+          break;
+        case ContractStandard.ERC721:
+          try {
+            estimatedFee = await account.estimateFee([
+              {
+                contractAddress: contractDetail.address,
+                entrypoint: 'transferFrom',
+                calldata: CallData.compile({
+                  from: wallet.address,
+                  to: receiver,
+                  tokenId: uint256.bnToUint256(transferDetail.tokenId),
+                }),
+              },
+            ]);
+          } catch (error) {
+            estimatedFee = await account.estimateFee([
+              {
+                contractAddress: contractDetail.address,
+                entrypoint: 'transfer_from',
+                calldata: CallData.compile({
+                  from: wallet.address,
+                  to: receiver,
+                  tokenId: uint256.bnToUint256(transferDetail.tokenId),
+                }),
+              },
+            ]);
+          }
+          break;
+        case ContractStandard.ERC1155:
+          try {
+            estimatedFee = await account.estimateFee([
+              {
+                contractAddress: contractDetail.address,
+                entrypoint: 'safeTransferFrom',
+                calldata: CallData.compile({
+                  from: wallet.address,
+                  to: receiver,
+                  id: uint256.bnToUint256(transferDetail.tokenId),
+                  amount: uint256.bnToUint256(transferDetail.amount),
+                  data: [],
+                }),
+              },
+            ]);
+          } catch (error) {
+            estimatedFee = await account.estimateFee([
+              {
+                contractAddress: contractDetail.address,
+                entrypoint: 'safe_transfer_from',
+                calldata: CallData.compile({
+                  from: wallet.address,
+                  to: receiver,
+                  id: uint256.bnToUint256(transferDetail.tokenId),
+                  amount: uint256.bnToUint256(transferDetail.amount),
+                  data: [],
+                }),
+              },
+            ]);
+          }
+          break;
+      }
     } catch (error) {
       console.log(error);
 
@@ -1004,6 +1227,21 @@ export class BotService {
       return;
     }
 
+    const ethBalance = await this.portfolioService.getWalletErc20Balance(
+      wallet.address,
+      COMMON_CONTRACT_ADDRESS.ETH,
+      wallet,
+    );
+
+    if (Number(ethBalance.amount) < Number(estimatedFee.suggestedMaxFee)) {
+      sendInsufficientBalanceErrorMessage(
+        this.bot,
+        msg,
+        estimatedFee.suggestedMaxFee.toString(),
+        encodeAddress(transferDetail.wallet.address),
+      );
+      return;
+    }
     transferDetail.estimatedFee = estimatedFee.suggestedMaxFee.toString();
     transferDetail.wallet.privateKey = privateKey;
 

@@ -10,7 +10,6 @@ import {
   sendAlreadyDeployedWalletMessage,
   sendDeployWalletFailedErrorMessage,
   sendDeployWalletSuccessMessage,
-  sendErrorMessage,
   sendInsufficientBalanceErrorMessage,
   sendInvolkeTransactionFailedErrorMessage,
   sendInvolkeTransactionSuccessMessage,
@@ -37,6 +36,7 @@ import {
 import { Web3Service } from '@app/web3/web3.service';
 import { CallData, uint256 } from 'starknet';
 import { parseUnits } from 'ethers';
+import { ContractStandard } from '@app/shared/types';
 
 @Injectable()
 export class WalletService {
@@ -192,6 +192,109 @@ export class WalletService {
         }),
       },
     ]);
+
+    await this.web3Service.awaitTransaction(txHash);
+    const isSuccess = await this.web3Service.awaitTransaction(txHash);
+
+    if (!isSuccess.isSuccess) {
+      sendInvolkeTransactionFailedErrorMessage(
+        bot,
+        msg,
+        txHash,
+        encodeAddress(wallet.address),
+      );
+      return null;
+    }
+
+    sendInvolkeTransactionSuccessMessage(
+      bot,
+      msg,
+      txHash,
+      encodeAddress(wallet.address),
+    );
+
+    return txHash;
+  }
+
+  async handleTransferNft(
+    bot: TelegramBot,
+    msg: TelegramBot.Message,
+    context: string,
+  ): Promise<string> {
+    const transferDetail = JSON.parse(context);
+    const { wallet, contractDetail, receiver, amount } = transferDetail;
+
+    const chainDocument = await this.chainModel.findOne();
+    const account = this.web3Service.getAccountInstance(
+      wallet.address,
+      wallet.privateKey,
+      chainDocument.rpc,
+    );
+
+    const callDataSnakeCase =
+      contractDetail.standard === ContractStandard.ERC721
+        ? [
+            {
+              contractAddress: contractDetail.address,
+              entrypoint: 'transfer_from',
+              calldata: CallData.compile({
+                from: wallet.address,
+                to: receiver,
+                token_id: uint256.bnToUint256(transferDetail.tokenId),
+              }),
+            },
+          ]
+        : [
+            {
+              contractAddress: contractDetail.address,
+              entrypoint: 'safe_transfer_from',
+              calldata: CallData.compile({
+                from: wallet.address,
+                to: receiver,
+                token_id: uint256.bnToUint256(transferDetail.tokenId),
+                value: uint256.bnToUint256(amount),
+                data: [],
+              }),
+            },
+          ];
+
+    const calldataCamelCase =
+      contractDetail.standard === ContractStandard.ERC721
+        ? [
+            {
+              contractAddress: contractDetail.address,
+              entrypoint: 'transferFrom',
+              calldata: CallData.compile({
+                from: wallet.address,
+                to: receiver,
+                token_id: uint256.bnToUint256(transferDetail.tokenId),
+              }),
+            },
+          ]
+        : [
+            {
+              contractAddress: contractDetail.address,
+              entrypoint: 'safeTransferFrom',
+              calldata: CallData.compile({
+                from: wallet.address,
+                to: receiver,
+                token_id: uint256.bnToUint256(transferDetail.tokenId),
+                value: uint256.bnToUint256(amount),
+                data: [],
+              }),
+            },
+          ];
+
+    let txHash: string = null;
+    try {
+      txHash = (await account.execute(callDataSnakeCase)).transaction_hash;
+    } catch (error) {
+      if (error.message.includes('not found in contract.')) {
+        txHash = (await account.execute(calldataCamelCase)).transaction_hash;
+      } else {
+        throw new Error(error.message);
+      }
+    }
 
     await this.web3Service.awaitTransaction(txHash);
     const isSuccess = await this.web3Service.awaitTransaction(txHash);

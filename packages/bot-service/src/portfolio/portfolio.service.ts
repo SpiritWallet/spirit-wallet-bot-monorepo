@@ -2,7 +2,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import {
   ContractDetailDocument,
   Erc20BalanceDocument,
@@ -74,8 +74,11 @@ export class PortfolioService {
   async getWalletErc20Balance(
     address: string,
     contractAddress: string,
+    wallet?: WalletDocument,
   ): Promise<Erc20BalancesDto> {
-    const wallet = await this.walletModel.findOne({ address: address });
+    if (!wallet) {
+      wallet = await this.walletModel.findOne({ address: address });
+    }
 
     if (!wallet) {
       return null;
@@ -84,7 +87,10 @@ export class PortfolioService {
     const erc20Balance = await this.erc20BalanceModel.aggregate([
       {
         $match: {
-          wallet: wallet._id,
+          wallet:
+            typeof wallet._id === 'string'
+              ? new Types.ObjectId(wallet._id)
+              : wallet._id,
           contractAddress: contractAddress,
         },
       },
@@ -106,6 +112,7 @@ export class PortfolioService {
         $limit: 1,
       },
     ]);
+
     return erc20Balance[0];
   }
 
@@ -156,5 +163,62 @@ export class PortfolioService {
     ]);
 
     return nftBalances;
+  }
+
+  async getWalletNftBalance(
+    address: string,
+    contractAddress: string,
+    tokenId: string,
+    wallet?: WalletDocument,
+  ) {
+    if (!wallet) {
+      wallet = await this.walletModel.findOne({ address: address });
+    }
+
+    if (!wallet) {
+      return null;
+    }
+
+    const nftBalance = await this.nftBalanceModel.aggregate([
+      {
+        $match: {
+          wallet: wallet._id,
+          contractAddress: contractAddress,
+          tokenId: tokenId,
+        },
+      },
+      {
+        $lookup: {
+          from: 'nftdetails',
+          localField: 'nftDetail',
+          foreignField: '_id',
+          as: 'nftDetail',
+        },
+      },
+      {
+        $unwind: {
+          path: '$nftDetail',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $lookup: {
+          from: 'contractdetails',
+          localField: 'contractAddress',
+          foreignField: 'address',
+          as: 'contractDetail',
+        },
+      },
+      {
+        $unwind: {
+          path: '$contractDetail',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $limit: 1,
+      },
+    ]);
+    return nftBalance[0];
   }
 }

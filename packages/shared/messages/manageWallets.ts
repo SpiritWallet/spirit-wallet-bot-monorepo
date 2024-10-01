@@ -235,7 +235,17 @@ export async function sendBalanceMessage(
       break;
     case PORTFOLIO_CALLBACK_DATA_PREFIXS.NFT:
       for (const balance of balances as NftBalancesDto[]) {
-        baseMessage += `${balance.amount} ${balance.nftDetail.name} (tokenID ${balance.tokenId}) of [${balance.contractDetail.name}](https://starkscan.co/nft-contract/${balance.contractAddress}) collection\n`;
+        baseMessage += `${balance.amount} ${balance.nftDetail.name ? balance.nftDetail.name : `${balance.contractDetail.name}#${balance.tokenId}`} (#TokenId ${balance.tokenId}) of [${balance.contractDetail.name}](https://starkscan.co/nft-contract/${balance.contractAddress}) collection\n`;
+        inlineKeyboard.push({
+          text: `${balance.nftDetail.name ? balance.nftDetail.name : `${balance.contractDetail.name}#${balance.tokenId}`} (TokenId ${balance.tokenId})`,
+          callback_data:
+            VIEW_TOKEN_CALLBACK_DATA_PREFIXS.NFT +
+            encodeAddress(balance.contractAddress) +
+            '_' +
+            walletIndex +
+            '_' +
+            balance.tokenId,
+        });
       }
 
       break;

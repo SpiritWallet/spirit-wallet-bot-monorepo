@@ -1,610 +1,934 @@
 [
   {
-    "name": "core::integer::u256",
+    "name": "Uint256",
+    "size": 2,
     "type": "struct",
     "members": [
       {
         "name": "low",
-        "type": "core::integer::u128"
+        "type": "felt",
+        "offset": 0
       },
       {
         "name": "high",
-        "type": "core::integer::u128"
+        "type": "felt",
+        "offset": 1
       }
     ]
   },
   {
-    "name": "mint",
-    "type": "function",
-    "inputs": [
+    "name": "Card",
+    "size": 5,
+    "type": "struct",
+    "members": [
       {
-        "name": "recipient",
-        "type": "core::starknet::contract_address::ContractAddress"
+        "name": "artist_name",
+        "type": "Uint256",
+        "offset": 0
+      },
+      {
+        "name": "season",
+        "type": "felt",
+        "offset": 2
+      },
+      {
+        "name": "scarcity",
+        "type": "felt",
+        "offset": 3
+      },
+      {
+        "name": "serial_number",
+        "type": "felt",
+        "offset": 4
+      }
+    ]
+  },
+  {
+    "name": "FeltMetadata",
+    "size": 2,
+    "type": "struct",
+    "members": [
+      {
+        "name": "hash",
+        "type": "felt",
+        "offset": 0
+      },
+      {
+        "name": "multihash_identifier",
+        "type": "felt",
+        "offset": 1
+      }
+    ]
+  },
+  {
+    "name": "Metadata",
+    "size": 3,
+    "type": "struct",
+    "members": [
+      {
+        "name": "hash",
+        "type": "Uint256",
+        "offset": 0
+      },
+      {
+        "name": "multihash_identifier",
+        "type": "felt",
+        "offset": 2
+      }
+    ]
+  },
+  {
+    "data": [
+      {
+        "name": "operator",
+        "type": "felt"
+      },
+      {
+        "name": "_from",
+        "type": "felt"
+      },
+      {
+        "name": "to",
+        "type": "felt"
       },
       {
         "name": "token_id",
-        "type": "core::integer::u256"
+        "type": "Uint256"
       },
       {
-        "name": "value",
-        "type": "core::integer::u256"
+        "name": "amount",
+        "type": "Uint256"
       }
     ],
-    "outputs": [],
-    "state_mutability": "external"
+    "keys": [],
+    "name": "TransferSingle",
+    "type": "event"
   },
   {
-    "name": "ERC1155Impl",
-    "type": "impl",
-    "interface_name": "openzeppelin::token::erc1155::interface::IERC1155"
-  },
-  {
-    "name": "core::array::Span::<core::starknet::contract_address::ContractAddress>",
-    "type": "struct",
-    "members": [
+    "data": [
       {
-        "name": "snapshot",
-        "type": "@core::array::Array::<core::starknet::contract_address::ContractAddress>"
+        "name": "operator",
+        "type": "felt"
+      },
+      {
+        "name": "_from",
+        "type": "felt"
+      },
+      {
+        "name": "to",
+        "type": "felt"
+      },
+      {
+        "name": "ids_len",
+        "type": "felt"
+      },
+      {
+        "name": "ids",
+        "type": "Uint256*"
+      },
+      {
+        "name": "amounts_len",
+        "type": "felt"
+      },
+      {
+        "name": "amounts",
+        "type": "Uint256*"
       }
-    ]
+    ],
+    "keys": [],
+    "name": "TransferBatch",
+    "type": "event"
   },
   {
-    "name": "core::array::Span::<core::integer::u256>",
-    "type": "struct",
-    "members": [
+    "data": [
       {
-        "name": "snapshot",
-        "type": "@core::array::Array::<core::integer::u256>"
+        "name": "owner",
+        "type": "felt"
+      },
+      {
+        "name": "operator",
+        "type": "felt"
+      },
+      {
+        "name": "approved",
+        "type": "felt"
       }
-    ]
+    ],
+    "keys": [],
+    "name": "ApprovalForAll",
+    "type": "event"
   },
   {
-    "name": "core::array::Span::<core::felt252>",
-    "type": "struct",
-    "members": [
+    "data": [
       {
-        "name": "snapshot",
-        "type": "@core::array::Array::<core::felt252>"
+        "name": "role",
+        "type": "felt"
+      },
+      {
+        "name": "account",
+        "type": "felt"
       }
-    ]
+    ],
+    "keys": [],
+    "name": "RoleGranted",
+    "type": "event"
   },
   {
-    "name": "core::bool",
-    "type": "enum",
-    "variants": [
+    "data": [
       {
-        "name": "False",
-        "type": "()"
+        "name": "role",
+        "type": "felt"
       },
       {
-        "name": "True",
-        "type": "()"
+        "name": "account",
+        "type": "felt"
       }
-    ]
+    ],
+    "keys": [],
+    "name": "RoleRevoked",
+    "type": "event"
   },
   {
-    "name": "openzeppelin::token::erc1155::interface::IERC1155",
-    "type": "interface",
-    "items": [
+    "data": [
       {
-        "name": "balance_of",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "account",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "token_id",
-            "type": "core::integer::u256"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "core::integer::u256"
-          }
-        ],
-        "state_mutability": "view"
+        "name": "season",
+        "type": "felt"
       },
       {
-        "name": "balance_of_batch",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "accounts",
-            "type": "core::array::Span::<core::starknet::contract_address::ContractAddress>"
-          },
-          {
-            "name": "token_ids",
-            "type": "core::array::Span::<core::integer::u256>"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "core::array::Span::<core::integer::u256>"
-          }
-        ],
-        "state_mutability": "view"
+        "name": "scarcity",
+        "type": "felt"
       },
       {
-        "name": "safe_transfer_from",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "from",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "to",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "token_id",
-            "type": "core::integer::u256"
-          },
-          {
-            "name": "value",
-            "type": "core::integer::u256"
-          },
-          {
-            "name": "data",
-            "type": "core::array::Span::<core::felt252>"
-          }
-        ],
-        "outputs": [],
-        "state_mutability": "external"
-      },
-      {
-        "name": "safe_batch_transfer_from",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "from",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "to",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "token_ids",
-            "type": "core::array::Span::<core::integer::u256>"
-          },
-          {
-            "name": "values",
-            "type": "core::array::Span::<core::integer::u256>"
-          },
-          {
-            "name": "data",
-            "type": "core::array::Span::<core::felt252>"
-          }
-        ],
-        "outputs": [],
-        "state_mutability": "external"
-      },
-      {
-        "name": "is_approved_for_all",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "owner",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "operator",
-            "type": "core::starknet::contract_address::ContractAddress"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "core::bool"
-          }
-        ],
-        "state_mutability": "view"
-      },
-      {
-        "name": "set_approval_for_all",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "operator",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "approved",
-            "type": "core::bool"
-          }
-        ],
-        "outputs": [],
-        "state_mutability": "external"
+        "name": "supply",
+        "type": "felt"
       }
-    ]
+    ],
+    "keys": [],
+    "name": "ScarcityAdded",
+    "type": "event"
   },
   {
-    "name": "ERC1155MetadataURIImpl",
-    "type": "impl",
-    "interface_name": "openzeppelin::token::erc1155::interface::IERC1155MetadataURI"
-  },
-  {
-    "name": "openzeppelin::token::erc1155::interface::IERC1155MetadataURI",
-    "type": "interface",
-    "items": [
+    "data": [
       {
-        "name": "uri",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "token_id",
-            "type": "core::integer::u256"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "core::felt252"
-          }
-        ],
-        "state_mutability": "view"
+        "name": "season",
+        "type": "felt"
+      },
+      {
+        "name": "scarcity",
+        "type": "felt"
       }
-    ]
+    ],
+    "keys": [],
+    "name": "ScarcityProductionStopped",
+    "type": "event"
   },
   {
-    "name": "ERC1155Camel",
-    "type": "impl",
-    "interface_name": "openzeppelin::token::erc1155::interface::IERC1155Camel"
-  },
-  {
-    "name": "openzeppelin::token::erc1155::interface::IERC1155Camel",
-    "type": "interface",
-    "items": [
-      {
-        "name": "balanceOf",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "account",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "tokenId",
-            "type": "core::integer::u256"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "core::integer::u256"
-          }
-        ],
-        "state_mutability": "view"
-      },
-      {
-        "name": "balanceOfBatch",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "accounts",
-            "type": "core::array::Span::<core::starknet::contract_address::ContractAddress>"
-          },
-          {
-            "name": "tokenIds",
-            "type": "core::array::Span::<core::integer::u256>"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "core::array::Span::<core::integer::u256>"
-          }
-        ],
-        "state_mutability": "view"
-      },
-      {
-        "name": "safeTransferFrom",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "from",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "to",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "tokenId",
-            "type": "core::integer::u256"
-          },
-          {
-            "name": "value",
-            "type": "core::integer::u256"
-          },
-          {
-            "name": "data",
-            "type": "core::array::Span::<core::felt252>"
-          }
-        ],
-        "outputs": [],
-        "state_mutability": "external"
-      },
-      {
-        "name": "safeBatchTransferFrom",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "from",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "to",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "tokenIds",
-            "type": "core::array::Span::<core::integer::u256>"
-          },
-          {
-            "name": "values",
-            "type": "core::array::Span::<core::integer::u256>"
-          },
-          {
-            "name": "data",
-            "type": "core::array::Span::<core::felt252>"
-          }
-        ],
-        "outputs": [],
-        "state_mutability": "external"
-      },
-      {
-        "name": "isApprovedForAll",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "owner",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "operator",
-            "type": "core::starknet::contract_address::ContractAddress"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "core::bool"
-          }
-        ],
-        "state_mutability": "view"
-      },
-      {
-        "name": "setApprovalForAll",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "operator",
-            "type": "core::starknet::contract_address::ContractAddress"
-          },
-          {
-            "name": "approved",
-            "type": "core::bool"
-          }
-        ],
-        "outputs": [],
-        "state_mutability": "external"
-      }
-    ]
-  },
-  {
-    "name": "SRC5Impl",
-    "type": "impl",
-    "interface_name": "openzeppelin::introspection::interface::ISRC5"
-  },
-  {
-    "name": "openzeppelin::introspection::interface::ISRC5",
-    "type": "interface",
-    "items": [
-      {
-        "name": "supports_interface",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "interface_id",
-            "type": "core::felt252"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "core::bool"
-          }
-        ],
-        "state_mutability": "view"
-      }
-    ]
-  },
-  {
-    "name": "SRC5CamelImpl",
-    "type": "impl",
-    "interface_name": "openzeppelin::introspection::interface::ISRC5Camel"
-  },
-  {
-    "name": "openzeppelin::introspection::interface::ISRC5Camel",
-    "type": "interface",
-    "items": [
-      {
-        "name": "supportsInterface",
-        "type": "function",
-        "inputs": [
-          {
-            "name": "interfaceId",
-            "type": "core::felt252"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "core::bool"
-          }
-        ],
-        "state_mutability": "view"
-      }
-    ]
-  },
-  {
-    "name": "constructor",
-    "type": "constructor",
+    "name": "initialize",
+    "type": "function",
     "inputs": [
       {
-        "name": "token_uri",
-        "type": "core::byte_array::ByteArray"
-      }
-    ]
-  },
-  {
-    "kind": "struct",
-    "name": "openzeppelin::token::erc1155::erc1155::ERC1155Component::TransferSingle",
-    "type": "event",
-    "members": [
-      {
-        "kind": "data",
-        "name": "operator",
-        "type": "core::starknet::contract_address::ContractAddress"
+        "name": "uri_len",
+        "type": "felt"
       },
       {
-        "kind": "data",
-        "name": "from",
-        "type": "core::starknet::contract_address::ContractAddress"
+        "name": "uri",
+        "type": "felt*"
       },
       {
-        "kind": "data",
-        "name": "to",
-        "type": "core::starknet::contract_address::ContractAddress"
-      },
-      {
-        "kind": "data",
-        "name": "id",
-        "type": "core::integer::u256"
-      },
-      {
-        "kind": "data",
-        "name": "value",
-        "type": "core::integer::u256"
-      }
-    ]
-  },
-  {
-    "kind": "struct",
-    "name": "openzeppelin::token::erc1155::erc1155::ERC1155Component::TransferBatch",
-    "type": "event",
-    "members": [
-      {
-        "kind": "data",
-        "name": "operator",
-        "type": "core::starknet::contract_address::ContractAddress"
-      },
-      {
-        "kind": "data",
-        "name": "from",
-        "type": "core::starknet::contract_address::ContractAddress"
-      },
-      {
-        "kind": "data",
-        "name": "to",
-        "type": "core::starknet::contract_address::ContractAddress"
-      },
-      {
-        "kind": "data",
-        "name": "ids",
-        "type": "core::array::Span::<core::integer::u256>"
-      },
-      {
-        "kind": "data",
-        "name": "values",
-        "type": "core::array::Span::<core::integer::u256>"
-      }
-    ]
-  },
-  {
-    "kind": "struct",
-    "name": "openzeppelin::token::erc1155::erc1155::ERC1155Component::ApprovalForAll",
-    "type": "event",
-    "members": [
-      {
-        "kind": "key",
         "name": "owner",
-        "type": "core::starknet::contract_address::ContractAddress"
-      },
-      {
-        "kind": "key",
-        "name": "operator",
-        "type": "core::starknet::contract_address::ContractAddress"
-      },
-      {
-        "kind": "data",
-        "name": "approved",
-        "type": "core::bool"
+        "type": "felt"
       }
-    ]
+    ],
+    "outputs": []
   },
   {
-    "kind": "struct",
-    "name": "openzeppelin::token::erc1155::erc1155::ERC1155Component::URI",
-    "type": "event",
-    "members": [
+    "name": "upgrade",
+    "type": "function",
+    "inputs": [
       {
-        "kind": "data",
-        "name": "value",
-        "type": "core::byte_array::ByteArray"
-      },
+        "name": "implementation",
+        "type": "felt"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "getIdentity",
+    "type": "function",
+    "inputs": [],
+    "outputs": [
       {
-        "kind": "key",
+        "name": "role",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "uri",
+    "type": "function",
+    "inputs": [
+      {
         "name": "id",
-        "type": "core::integer::u256"
+        "type": "Uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "uri_len",
+        "type": "felt"
+      },
+      {
+        "name": "uri",
+        "type": "felt*"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "contractURI",
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "contractURI_len",
+        "type": "felt"
+      },
+      {
+        "name": "contractURI",
+        "type": "felt*"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "MINTER_ROLE",
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "role",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "CAPPER_ROLE",
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "role",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "owner",
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "owner",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "roleMember",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "felt"
+      },
+      {
+        "name": "index",
+        "type": "felt"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "account",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "roleMembersCount",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "felt"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "count",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "hasRole",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "felt"
+      },
+      {
+        "name": "account",
+        "type": "felt"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "has_role",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "card",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "card_id",
+        "type": "Uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "card",
+        "type": "Card"
+      },
+      {
+        "name": "metadata",
+        "type": "FeltMetadata"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "oldCard",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "card_id",
+        "type": "Uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "card",
+        "type": "Card"
+      },
+      {
+        "name": "metadata",
+        "type": "Metadata"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "cardId",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "card",
+        "type": "Card"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "card_id",
+        "type": "Uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "cardExists",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "card_id",
+        "type": "Uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "res",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "pack",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "pack_id",
+        "type": "Uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "max_supply",
+        "type": "felt"
+      },
+      {
+        "name": "metadata",
+        "type": "Metadata"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "packExists",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "pack_id",
+        "type": "Uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "res",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "balanceOf",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "felt"
+      },
+      {
+        "name": "token_id",
+        "type": "Uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "balance",
+        "type": "Uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "scarcityMaxSupply",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "season",
+        "type": "felt"
+      },
+      {
+        "name": "scarcity",
+        "type": "felt"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "max_supply",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "isApprovedForAll",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "felt"
+      },
+      {
+        "name": "operator",
+        "type": "felt"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "is_approved",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "getUnlocked",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "felt"
+      },
+      {
+        "name": "token_id",
+        "type": "Uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "amount",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "marketplace",
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "marketplace",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "setUri",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "uri_len",
+        "type": "felt"
+      },
+      {
+        "name": "uri",
+        "type": "felt*"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "setContractURI",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "contract_uri_len",
+        "type": "felt"
+      },
+      {
+        "name": "contract_uri",
+        "type": "felt*"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "setApprovalForAll",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "operator",
+        "type": "felt"
+      },
+      {
+        "name": "approved",
+        "type": "felt"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "setMarketplace",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "marketplace",
+        "type": "felt"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "addMinter",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "felt"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "revokeMinter",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "felt"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "addCapper",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "felt"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "revokeCapper",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "felt"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "createAndMintCard",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "to",
+        "type": "felt"
+      },
+      {
+        "name": "card",
+        "type": "Card"
+      },
+      {
+        "name": "metadata",
+        "type": "FeltMetadata"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "createPack",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "max_supply",
+        "type": "felt"
+      },
+      {
+        "name": "metadata",
+        "type": "Metadata"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "pack_id",
+        "type": "Uint256"
       }
     ]
   },
   {
-    "kind": "enum",
-    "name": "openzeppelin::token::erc1155::erc1155::ERC1155Component::Event",
-    "type": "event",
-    "variants": [
+    "name": "createCommonPack",
+    "type": "function",
+    "inputs": [
       {
-        "kind": "nested",
-        "name": "TransferSingle",
-        "type": "openzeppelin::token::erc1155::erc1155::ERC1155Component::TransferSingle"
+        "name": "season",
+        "type": "felt"
       },
       {
-        "kind": "nested",
-        "name": "TransferBatch",
-        "type": "openzeppelin::token::erc1155::erc1155::ERC1155Component::TransferBatch"
-      },
+        "name": "metadata",
+        "type": "Metadata"
+      }
+    ],
+    "outputs": [
       {
-        "kind": "nested",
-        "name": "ApprovalForAll",
-        "type": "openzeppelin::token::erc1155::erc1155::ERC1155Component::ApprovalForAll"
-      },
-      {
-        "kind": "nested",
-        "name": "URI",
-        "type": "openzeppelin::token::erc1155::erc1155::ERC1155Component::URI"
+        "name": "pack_id",
+        "type": "Uint256"
       }
     ]
   },
   {
-    "kind": "enum",
-    "name": "openzeppelin::introspection::src5::SRC5Component::Event",
-    "type": "event",
-    "variants": []
-  },
-  {
-    "kind": "enum",
-    "name": "erc1155::erc1155::MyERC1155::Event",
-    "type": "event",
-    "variants": [
+    "name": "mintPack",
+    "type": "function",
+    "inputs": [
       {
-        "kind": "flat",
-        "name": "ERC1155Event",
-        "type": "openzeppelin::token::erc1155::erc1155::ERC1155Component::Event"
+        "name": "to",
+        "type": "felt"
       },
       {
-        "kind": "flat",
-        "name": "SRC5Event",
-        "type": "openzeppelin::introspection::src5::SRC5Component::Event"
+        "name": "pack_id",
+        "type": "Uint256"
+      },
+      {
+        "name": "amount",
+        "type": "felt"
+      },
+      {
+        "name": "unlocked",
+        "type": "felt"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "openPackFrom",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "_from",
+        "type": "felt"
+      },
+      {
+        "name": "pack_id",
+        "type": "Uint256"
+      },
+      {
+        "name": "cards_len",
+        "type": "felt"
+      },
+      {
+        "name": "cards",
+        "type": "Card*"
+      },
+      {
+        "name": "metadata_len",
+        "type": "felt"
+      },
+      {
+        "name": "metadata",
+        "type": "FeltMetadata*"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "addScarcityForSeason",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "season",
+        "type": "felt"
+      },
+      {
+        "name": "supply",
+        "type": "felt"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "scarcity",
+        "type": "felt"
       }
     ]
+  },
+  {
+    "name": "safeTransferFrom",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "_from",
+        "type": "felt"
+      },
+      {
+        "name": "to",
+        "type": "felt"
+      },
+      {
+        "name": "token_id",
+        "type": "Uint256"
+      },
+      {
+        "name": "amount",
+        "type": "Uint256"
+      },
+      {
+        "name": "data_len",
+        "type": "felt"
+      },
+      {
+        "name": "data",
+        "type": "felt*"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "safeBatchTransferFrom",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "_from",
+        "type": "felt"
+      },
+      {
+        "name": "to",
+        "type": "felt"
+      },
+      {
+        "name": "ids_len",
+        "type": "felt"
+      },
+      {
+        "name": "ids",
+        "type": "Uint256*"
+      },
+      {
+        "name": "amounts_len",
+        "type": "felt"
+      },
+      {
+        "name": "amounts",
+        "type": "Uint256*"
+      },
+      {
+        "name": "data_len",
+        "type": "felt"
+      },
+      {
+        "name": "data",
+        "type": "felt*"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "name": "transferOwnership",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "new_owner",
+        "type": "felt"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "new_owner",
+        "type": "felt"
+      }
+    ]
+  },
+  {
+    "name": "renounceOwnership",
+    "type": "function",
+    "inputs": [],
+    "outputs": []
   }
 ]
