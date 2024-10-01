@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import TelegramBot from 'node-telegram-bot-api';
-import { Erc20BalancesDto } from '../dto';
+import { Erc20BalancesDto, NftBalancesDto } from '../dto';
 import { WalletDocument } from '../models';
 import {
   CONFIRM_TRANSACTION_CALLBACK_DATA_PREFIXS,
@@ -10,6 +10,7 @@ import {
 } from '../constants';
 import { encodeAddress } from '../utils';
 import { formatUnits } from 'ethers';
+import { ContractStandard } from '../types';
 
 export const inlineErc20DetailKeyboard = (
   encodedAddress: string,
@@ -26,6 +27,37 @@ export const inlineErc20DetailKeyboard = (
             encodedContractAddress +
             '_' +
             walletIndex,
+        },
+      ],
+      [
+        {
+          text: 'Back to Portfolio',
+          callback_data:
+            TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_PORTFOLIO + encodedAddress,
+        },
+      ],
+    ],
+  };
+};
+
+export const inlineNftDetailKeyboard = (
+  encodedAddress: string,
+  encodedContractAddress: string,
+  tokenId: string,
+  walletIndex: number,
+) => {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: 'Transfer',
+          callback_data:
+            TRANSFER_CALLBACK_DATA_PREFIXS.NFT +
+            encodedContractAddress +
+            '_' +
+            walletIndex +
+            '_' +
+            tokenId,
         },
       ],
       [
@@ -83,6 +115,28 @@ export function sendErc20DetailMessage(
   });
 }
 
+export function sendNftDetailMessage(
+  bot: TelegramBot,
+  callbackQuery: TelegramBot.CallbackQuery,
+  walletDocument: WalletDocument,
+  balance: NftBalancesDto,
+) {
+  const message = `${balance.amount} ${balance.nftDetail.name ? balance.nftDetail.name : `${balance.contractDetail.name}#${balance.tokenId}`} (#TokenId ${balance.tokenId}) of [${balance.contractDetail.name}](https://starkscan.co/nft-contract/${balance.contractAddress}) collection`;
+
+  bot.editMessageText(message, {
+    chat_id: callbackQuery.message.chat.id,
+    message_id: callbackQuery.message.message_id,
+    parse_mode: 'Markdown',
+    reply_markup: inlineNftDetailKeyboard(
+      encodeAddress(walletDocument.address),
+      encodeAddress(balance.contractAddress),
+      balance.tokenId,
+      walletDocument.index,
+    ),
+    disable_web_page_preview: true,
+  });
+}
+
 export function sendRequireErc20ReceiverMessage(
   bot: TelegramBot,
   msg: TelegramBot.Message,
@@ -107,6 +161,18 @@ export function sendRequireErc20AmountMessage(
   });
 }
 
+export function sendRequireNftReceiverMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+) {
+  const message = `Please enter the address of the receiver:
+  \n\n`;
+
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
+  });
+}
+
 export function sendConfirmTransactionMessage(
   bot: TelegramBot,
   msg: TelegramBot.Message,
@@ -115,8 +181,13 @@ export function sendConfirmTransactionMessage(
 ) {
   const transferDetail = JSON.parse(context);
 
-  const message = `Are you sure you want to transfer ${transferDetail.amount} $${transferDetail.contractDetail.symbol} to ${transferDetail.receiver}?
+  let message = `Are you sure you want to transfer ${transferDetail.amount} $${transferDetail.contractDetail.symbol} to ${transferDetail.receiver}?
   \n\n`;
+
+  if (transferDetail.contractDetail.standard !== ContractStandard.ERC20) {
+    message = `Are you sure you want to transfer ${transferDetail.amount} #TokenId ${transferDetail.tokenId} of ${transferDetail.contractDetail.name} collection to ${transferDetail.receiver}?
+    \n\n`;
+  }
 
   bot.sendMessage(msg.chat.id, message, {
     parse_mode: 'Markdown',

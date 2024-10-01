@@ -18,6 +18,8 @@ export enum UserState {
   AwaitingInvokeTransaction = 'AwaitingInvokeTransaction',
   AwaitingRequireErc20Receiver = 'AwaitingRequireErc20Receiver',
   AwaitingRequireErc20Amount = 'AwaitingRequireErc20Amount',
+  AwaitingRequireNftReceiver = 'AwaitingRequireNftReceiver',
+  AwaitingRequireNftAmount = 'AwaitingRequireNftAmount',
   AwaitingConfirmTransaction = 'AwaitingConfirmTransaction',
 }
 

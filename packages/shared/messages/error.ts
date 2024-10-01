@@ -147,6 +147,31 @@ export function sendInsufficientErc20BalanceErrorMessage(
   });
 }
 
+export function sendInsufficientNftBalanceErrorMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+  encodedAddress: string,
+) {
+  const message = `Oops! You don't have enough NFT to perform this action\n\nPlease try again.`;
+
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: 'Back to wallet functions',
+            callback_data:
+              TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLET_FUNCTIONS +
+              encodedAddress,
+          },
+        ],
+      ],
+    },
+    disable_web_page_preview: true,
+  });
+}
+
 export function sendInvalidAmountMessage(
   bot: TelegramBot,
   msg: TelegramBot.Message,
