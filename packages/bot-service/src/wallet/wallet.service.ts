@@ -13,6 +13,7 @@ import {
   sendInsufficientBalanceErrorMessage,
   sendInvolkeTransactionFailedErrorMessage,
   sendInvolkeTransactionSuccessMessage,
+  sendNewBulkTransferMessage,
   sendNoWalletMessage,
   sendPortfolioMessage,
   sendSecurityAndPrivacyMessage,
@@ -36,7 +37,8 @@ import {
 import { Web3Service } from '@app/web3/web3.service';
 import { CallData, uint256 } from 'starknet';
 import { parseUnits } from 'ethers';
-import { ContractStandard } from '@app/shared/types';
+import { ContractStandard, UserState } from '@app/shared/types';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class WalletService {
@@ -47,13 +49,14 @@ export class WalletService {
     private readonly erc20BalanceModel: Model<Erc20BalanceDocument>,
     @InjectModel(Chains.name)
     private readonly chainModel: Model<ChainDocument>,
+    private readonly redisService: RedisService,
     private readonly web3Service: Web3Service,
   ) {}
 
-  classifyWalletFunction(
+  async classifyWalletFunction(
     bot: TelegramBot,
     callbackQuery: TelegramBot.CallbackQuery,
-  ): boolean {
+  ): Promise<boolean> {
     const data = callbackQuery.data;
     const [fnPrefix, functionName] = data.split('_');
     const combinedPrefix = fnPrefix + '_' + functionName + '_';
@@ -69,6 +72,7 @@ export class WalletService {
       case FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER:
         break;
       case FUNCTIONS_CALLBACK_DATA_PREFIXS.BULK_TRANSFER:
+        await this.handleAddNewSectionBulkTransfer(bot, callbackQuery);
         break;
       case FUNCTIONS_CALLBACK_DATA_PREFIXS.SECURITY_AND_PRIVACY:
         sendSecurityAndPrivacyMessage(bot, callbackQuery);
@@ -160,69 +164,51 @@ export class WalletService {
     return txHash;
   }
 
-  async handleTransferErc20(
+  async handleAddNewSectionBulkTransfer(
     bot: TelegramBot,
-    msg: TelegramBot.Message,
-    context: string,
-  ): Promise<string> {
-    const transferDetail = JSON.parse(context);
-    const { wallet, contractDetail, receiver } = transferDetail;
-
-    const chainDocument = await this.chainModel.findOne();
-    const account = this.web3Service.getAccountInstance(
-      wallet.address,
-      wallet.privateKey,
-      chainDocument.rpc,
+    callbackQuery: TelegramBot.CallbackQuery,
+  ) {
+    await this.redisService.set(
+      `user:${callbackQuery.message.chat.id}:state`,
+      UserState.AwaitingNewBulkTransfer,
     );
 
-    const { transaction_hash: txHash } = await account.execute([
-      {
-        contractAddress: contractDetail.address,
-        entrypoint: 'transfer',
-        calldata: CallData.compile({
-          recipient: receiver,
-          amount: uint256.bnToUint256(
-            Number(
-              parseUnits(
-                transferDetail.amount,
-                transferDetail.contractDetail.decimals,
-              ),
-            ) - Number(transferDetail.estimatedFee),
-          ),
-        }),
-      },
-    ]);
-
-    await this.web3Service.awaitTransaction(txHash);
-    const isSuccess = await this.web3Service.awaitTransaction(txHash);
-
-    if (!isSuccess.isSuccess) {
-      sendInvolkeTransactionFailedErrorMessage(
-        bot,
-        msg,
-        txHash,
-        encodeAddress(wallet.address),
-      );
-      return null;
-    }
-
-    sendInvolkeTransactionSuccessMessage(
-      bot,
-      msg,
-      txHash,
-      encodeAddress(wallet.address),
-    );
-
-    return txHash;
+    sendNewBulkTransferMessage(bot, callbackQuery);
   }
 
-  async handleTransferNft(
+  async handleAddSectionBulkTransfer(
+    bot: TelegramBot,
+    callbackQuery: TelegramBot.CallbackQuery,
+  ) {
+    const state = await this.redisService.get(
+      `user:${callbackQuery.message.chat.id}:state`,
+    );
+
+    if (state && state.startsWith(UserState.AwaittingNextActionBulkTransfer)) {
+      const stringifiedContext = state.replace(
+        UserState.AwaittingNextActionBulkTransfer + '_',
+        '',
+      );
+
+      const context = JSON.parse(stringifiedContext);
+      context.currentIndex++;
+      await this.redisService.set(
+        `user:${callbackQuery.message.chat.id}:state`,
+        UserState.AwaittingAddNewSectionBulkTransfer +
+          '_' +
+          JSON.stringify(context),
+      );
+      sendNewBulkTransferMessage(bot, callbackQuery);
+    } else return;
+  }
+
+  async handleExecuteTransaction(
     bot: TelegramBot,
     msg: TelegramBot.Message,
     context: string,
   ): Promise<string> {
     const transferDetail = JSON.parse(context);
-    const { wallet, contractDetail, receiver, amount } = transferDetail;
+    const { wallet, sectionDetail } = transferDetail;
 
     const chainDocument = await this.chainModel.findOne();
     const account = this.web3Service.getAccountInstance(
@@ -231,66 +217,86 @@ export class WalletService {
       chainDocument.rpc,
     );
 
-    const callDataSnakeCase =
-      contractDetail.standard === ContractStandard.ERC721
-        ? [
-            {
-              contractAddress: contractDetail.address,
-              entrypoint: 'transfer_from',
-              calldata: CallData.compile({
-                from: wallet.address,
-                to: receiver,
-                token_id: uint256.bnToUint256(transferDetail.tokenId),
-              }),
-            },
-          ]
-        : [
-            {
-              contractAddress: contractDetail.address,
-              entrypoint: 'safe_transfer_from',
-              calldata: CallData.compile({
-                from: wallet.address,
-                to: receiver,
-                token_id: uint256.bnToUint256(transferDetail.tokenId),
-                value: uint256.bnToUint256(amount),
-                data: [],
-              }),
-            },
-          ];
-
-    const calldataCamelCase =
-      contractDetail.standard === ContractStandard.ERC721
-        ? [
-            {
-              contractAddress: contractDetail.address,
-              entrypoint: 'transferFrom',
-              calldata: CallData.compile({
-                from: wallet.address,
-                to: receiver,
-                token_id: uint256.bnToUint256(transferDetail.tokenId),
-              }),
-            },
-          ]
-        : [
-            {
-              contractAddress: contractDetail.address,
-              entrypoint: 'safeTransferFrom',
-              calldata: CallData.compile({
-                from: wallet.address,
-                to: receiver,
-                token_id: uint256.bnToUint256(transferDetail.tokenId),
-                value: uint256.bnToUint256(amount),
-                data: [],
-              }),
-            },
-          ];
-
+    const multiCallData = [];
+    const multiCallCamelCaseData = [];
+    for (const section of sectionDetail) {
+      const { contractDetail, receiver, amount } = section;
+      switch (contractDetail.standard) {
+        case ContractStandard.ERC20:
+          multiCallData.push({
+            contractAddress: contractDetail.address,
+            entrypoint: 'transfer',
+            calldata: CallData.compile({
+              recipient: receiver,
+              amount: uint256.bnToUint256(
+                Number(parseUnits(amount, contractDetail.decimals)),
+              ),
+            }),
+          });
+          multiCallCamelCaseData.push({
+            contractAddress: contractDetail.address,
+            entrypoint: 'transfer',
+            calldata: CallData.compile({
+              recipient: receiver,
+              amount: uint256.bnToUint256(
+                Number(parseUnits(amount, contractDetail.decimals)),
+              ),
+            }),
+          });
+          break;
+        case ContractStandard.ERC721:
+          multiCallData.push({
+            contractAddress: contractDetail.address,
+            entrypoint: 'transfer_from',
+            calldata: CallData.compile({
+              from: wallet.address,
+              to: receiver,
+              token_id: uint256.bnToUint256(section.tokenId),
+            }),
+          });
+          multiCallCamelCaseData.push({
+            contractAddress: contractDetail.address,
+            entrypoint: 'transferFrom',
+            calldata: CallData.compile({
+              from: wallet.address,
+              to: receiver,
+              token_id: uint256.bnToUint256(section.tokenId),
+            }),
+          });
+          break;
+        case ContractStandard.ERC1155:
+          multiCallData.push({
+            contractAddress: contractDetail.address,
+            entrypoint: 'safe_transfer_from',
+            calldata: CallData.compile({
+              from: wallet.address,
+              to: receiver,
+              id: uint256.bnToUint256(section.tokenId),
+              amount: uint256.bnToUint256(amount),
+              data: [],
+            }),
+          });
+          multiCallCamelCaseData.push({
+            contractAddress: contractDetail.address,
+            entrypoint: 'safeTransferFrom',
+            calldata: CallData.compile({
+              from: wallet.address,
+              to: receiver,
+              id: uint256.bnToUint256(section.tokenId),
+              amount: uint256.bnToUint256(amount),
+              data: [],
+            }),
+          });
+          break;
+      }
+    }
     let txHash: string = null;
     try {
-      txHash = (await account.execute(callDataSnakeCase)).transaction_hash;
+      txHash = (await account.execute(multiCallData)).transaction_hash;
     } catch (error) {
       if (error.message.includes('not found in contract.')) {
-        txHash = (await account.execute(calldataCamelCase)).transaction_hash;
+        txHash = (await account.execute(multiCallCamelCaseData))
+          .transaction_hash;
       } else {
         throw new Error(error.message);
       }

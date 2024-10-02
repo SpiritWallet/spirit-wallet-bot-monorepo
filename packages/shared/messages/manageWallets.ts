@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import {
+  BULK_TRANSFER_CALLBACK_DATA_PREFIXS,
   COMMAND_CALLBACK_DATA_PREFIXS,
   FUNCTIONS_CALLBACK_DATA_PREFIXS,
   PORTFOLIO_CALLBACK_DATA_PREFIXS,
@@ -30,6 +31,11 @@ export const inlineFunctionsKeyboard = (encodedAddress: string) => {
           text: 'Portfolio',
           callback_data:
             FUNCTIONS_CALLBACK_DATA_PREFIXS.PORTFOLIO + encodedAddress,
+        },
+        {
+          text: 'Bulk Transfer',
+          callback_data:
+            FUNCTIONS_CALLBACK_DATA_PREFIXS.BULK_TRANSFER + encodedAddress,
         },
       ],
       [
@@ -221,6 +227,7 @@ export async function sendBalanceMessage(
 
   switch (combinedPrefix) {
     case PORTFOLIO_CALLBACK_DATA_PREFIXS.ERC20_TOKENS:
+    case BULK_TRANSFER_CALLBACK_DATA_PREFIXS.ERC20:
       for (const balance of balances) {
         baseMessage += `${balance.amount === '0' ? balance.amount : formatUnits(balance.amount, balance.contractDetail.decimals)} $${balance.contractDetail.symbol}\n`;
         inlineKeyboard.push({
@@ -234,6 +241,7 @@ export async function sendBalanceMessage(
       }
       break;
     case PORTFOLIO_CALLBACK_DATA_PREFIXS.NFT:
+    case BULK_TRANSFER_CALLBACK_DATA_PREFIXS.NFT:
       for (const balance of balances as NftBalancesDto[]) {
         baseMessage += `${balance.amount} ${balance.nftDetail.name ? balance.nftDetail.name : `${balance.contractDetail.name}#${balance.tokenId}`} (#TokenId ${balance.tokenId}) of [${balance.contractDetail.name}](https://starkscan.co/nft-contract/${balance.contractAddress}) collection\n`;
         inlineKeyboard.push({
@@ -258,7 +266,19 @@ export async function sendBalanceMessage(
     reply_markup: {
       inline_keyboard: [
         inlineKeyboard,
-        ...inlineBalancesKeyboard(encodedAddress),
+        ...(combinedPrefix === PORTFOLIO_CALLBACK_DATA_PREFIXS.ERC20_TOKENS ||
+        combinedPrefix === PORTFOLIO_CALLBACK_DATA_PREFIXS.NFT
+          ? inlineBalancesKeyboard(encodedAddress)
+          : [
+              [
+                {
+                  text: 'Back to wallet functions',
+                  callback_data:
+                    TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLET_FUNCTIONS +
+                    encodedAddress,
+                },
+              ],
+            ]),
       ],
     },
     disable_web_page_preview: true,

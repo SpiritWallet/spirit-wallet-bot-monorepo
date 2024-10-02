@@ -21,6 +21,9 @@ export enum UserState {
   AwaitingRequireNftReceiver = 'AwaitingRequireNftReceiver',
   AwaitingRequireNftAmount = 'AwaitingRequireNftAmount',
   AwaitingConfirmTransaction = 'AwaitingConfirmTransaction',
+  AwaitingNewBulkTransfer = 'AwaitingNewBulkTransfer',
+  AwaittingNextActionBulkTransfer = 'AwaitingNextActionBulkTransfer',
+  AwaittingAddNewSectionBulkTransfer = 'AwaitingAddNewSectionBulkTransfer',
 }
 
 export enum WalletAction {
