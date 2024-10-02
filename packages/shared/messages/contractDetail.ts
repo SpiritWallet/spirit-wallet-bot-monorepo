@@ -180,13 +180,19 @@ export function sendConfirmTransactionMessage(
   estimatedFee: string,
 ) {
   const transferDetail = JSON.parse(context);
-
-  let message = `Are you sure you want to transfer ${transferDetail.amount} $${transferDetail.contractDetail.symbol} to ${transferDetail.receiver}?
-  \n\n`;
-
-  if (transferDetail.contractDetail.standard !== ContractStandard.ERC20) {
-    message = `Are you sure you want to transfer ${transferDetail.amount} #TokenId ${transferDetail.tokenId} of ${transferDetail.contractDetail.name} collection to ${transferDetail.receiver}?
-    \n\n`;
+  const { sectionDetail } = transferDetail;
+  let message = `Review the transaction details below\n`;
+  for (const section of sectionDetail) {
+    const { contractDetail, amount, receiver } = section;
+    switch (contractDetail.standard) {
+      case ContractStandard.ERC20:
+        message += `\n${amount} $${contractDetail.symbol} to ${receiver}\n`;
+        break;
+      case ContractStandard.ERC721:
+      case ContractStandard.ERC1155:
+        message += `\n${amount} #TokenId ${section.tokenId} of ${contractDetail.name} to ${receiver}\n`;
+        break;
+    }
   }
 
   bot.sendMessage(msg.chat.id, message, {

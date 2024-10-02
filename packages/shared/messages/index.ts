@@ -7,3 +7,4 @@ export * from './password';
 export * from './error';
 export * from './onchain';
 export * from './contractDetail';
+export * from './bulkTransaction';

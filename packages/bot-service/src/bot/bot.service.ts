@@ -41,6 +41,7 @@ import {
   sendRequireNftReceiverMessage,
   sendInsufficientBalanceErrorMessage,
   sendInsufficientNftBalanceErrorMessage,
+  sendReviewBulkTransfer,
 } from '@app/shared/messages';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -63,11 +64,11 @@ import {
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import {
+  BULK_TRANSFER_CALLBACK_DATA_PREFIXS,
   COMMAND_CALLBACK_DATA_PREFIXS,
   COMMON_CONTRACT_ADDRESS,
   CONFIRM_TRANSACTION_CALLBACK_DATA_PREFIXS,
   FUNCTIONS_CALLBACK_DATA_PREFIXS,
-  PORTFOLIO_CALLBACK_DATA_PREFIXS,
   SECURITY_AND_PRIVACY_CALLBACK_DATA_PREFIXS,
   SPECIAL_PREFIXS,
   TURN_BACK_CALLBACK_DATA_KEYS,
@@ -89,10 +90,10 @@ import {
   verifyPassword,
 } from '@app/shared/utils';
 import { WalletService } from '../wallet/wallet.service';
-import { isHexadecimal, isNumberString } from 'class-validator';
+import { isHexadecimal, isNumberString, isInt } from 'class-validator';
 import { formatUnits, parseUnits } from 'ethers';
 import { Web3Service } from '@app/web3/web3.service';
-import { CallData, uint256, EstimateFee } from 'starknet';
+import { CallData, uint256, EstimateFee, Account } from 'starknet';
 
 @Injectable()
 export class BotService {
@@ -395,7 +396,7 @@ export class BotService {
 
         const balance = await this.portfolioService.getWalletErc20Balance(
           context.wallet.address,
-          context.contractDetail.address,
+          context.sectionDetail[context.currentIndex].contractDetail.address,
           context.wallet,
         );
 
@@ -414,15 +415,25 @@ export class BotService {
         // delete the state
         await this.redisService.del(`user:${chatId}:state`);
 
-        context.amount = message;
+        context.sectionDetail[context.currentIndex].amount = message;
         // require password
-        await this.requirePassword(
-          msg,
-          UserState.AwaitingInvokeTransaction +
-            '_' +
-            FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER +
-            JSON.stringify(context),
-        );
+        if (!context.isBulkTransfer) {
+          await this.requirePassword(
+            msg,
+            UserState.AwaitingInvokeTransaction +
+              '_' +
+              FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER +
+              JSON.stringify(context),
+          );
+        } else {
+          await this.redisService.set(
+            `user:${msg.chat.id}:state`,
+            UserState.AwaittingNextActionBulkTransfer +
+              '_' +
+              JSON.stringify(context),
+          );
+          sendReviewBulkTransfer(this.bot, msg, JSON.stringify(context));
+        }
       }
 
       if (state.startsWith(UserState.AwaitingRequireNftReceiver)) {
@@ -444,18 +455,32 @@ export class BotService {
         // delete the state
         await this.redisService.del(`user:${chatId}:state`);
 
-        context.receiver = formattedContractAddress(message);
-        if (context.contractDetail.standard === ContractStandard.ERC1155) {
+        context.sectionDetail[context.currentIndex].receiver =
+          formattedContractAddress(message);
+        if (
+          context.sectionDetail[context.currentIndex].contractDetail
+            .standard === ContractStandard.ERC1155
+        ) {
           await this.handleRequireNftAmount(msg, JSON.stringify(context));
         } else {
-          context.amount = '1';
-          await this.requirePassword(
-            msg,
-            UserState.AwaitingInvokeTransaction +
-              '_' +
-              FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER +
-              JSON.stringify(context),
-          );
+          context.sectionDetail[context.currentIndex].amount = '1';
+          if (!context.isBulkTransfer) {
+            await this.requirePassword(
+              msg,
+              UserState.AwaitingInvokeTransaction +
+                '_' +
+                FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER +
+                JSON.stringify(context),
+            );
+          } else {
+            await this.redisService.set(
+              `user:${msg.chat.id}:state`,
+              UserState.AwaittingNextActionBulkTransfer +
+                '_' +
+                JSON.stringify(context),
+            );
+            sendReviewBulkTransfer(this.bot, msg, JSON.stringify(context));
+          }
         }
       }
 
@@ -465,12 +490,13 @@ export class BotService {
           '',
         );
 
-        if (!isNumberString(message)) {
+        if (!isNumberString(message) && !isInt(Number(message))) {
           sendInvalidAmountMessage(this.bot, msg);
           return;
         }
         const context = JSON.parse(stringifiedContext);
-        const [wallet, contractDetail, tokenId] = context;
+        const { wallet, sectionDetail, currentIndex } = context;
+        const { contractDetail, tokenId } = sectionDetail[currentIndex];
 
         const balance = await this.portfolioService.getWalletNftBalance(
           wallet.address,
@@ -490,15 +516,25 @@ export class BotService {
         // delete the state
         await this.redisService.del(`user:${chatId}:state`);
 
-        context.amount = message;
+        sectionDetail[currentIndex].amount = message;
         // require password
-        await this.requirePassword(
-          msg,
-          UserState.AwaitingInvokeTransaction +
-            '_' +
-            FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER +
-            JSON.stringify(context),
-        );
+        if (!context.isBulkTransfer) {
+          await this.requirePassword(
+            msg,
+            UserState.AwaitingInvokeTransaction +
+              '_' +
+              FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER +
+              JSON.stringify(context),
+          );
+        } else {
+          await this.redisService.set(
+            `user:${msg.chat.id}:state`,
+            UserState.AwaittingNextActionBulkTransfer +
+              '_' +
+              JSON.stringify(context),
+          );
+          sendReviewBulkTransfer(this.bot, msg, JSON.stringify(context));
+        }
       }
     });
   }
@@ -563,10 +599,11 @@ export class BotService {
 
       // send message of specific function
       if (data.startsWith(SPECIAL_PREFIXS.FUNCTION)) {
-        const isRequirePassword = this.walletService.classifyWalletFunction(
-          this.bot,
-          callbackQuery,
-        );
+        const isRequirePassword =
+          await this.walletService.classifyWalletFunction(
+            this.bot,
+            callbackQuery,
+          );
         if (!isRequirePassword) return;
 
         const combinedValue = UserState.AwaitingInvokeTransaction + '_' + data;
@@ -575,18 +612,22 @@ export class BotService {
       }
 
       // execute portfolio function
-      if (data.startsWith(SPECIAL_PREFIXS.PORTFOLIO)) {
+      if (
+        data.startsWith(SPECIAL_PREFIXS.PORTFOLIO) ||
+        data.startsWith(BULK_TRANSFER_CALLBACK_DATA_PREFIXS.ERC20) ||
+        data.startsWith(BULK_TRANSFER_CALLBACK_DATA_PREFIXS.NFT)
+      ) {
         const [fnPrefix, functionName, encodedAddress] = data.split('_');
         const combinedPrefix = fnPrefix + '_' + functionName + '_';
 
         let balances: Erc20BalancesDto[] = [];
-        switch (combinedPrefix) {
-          case PORTFOLIO_CALLBACK_DATA_PREFIXS.ERC20_TOKENS:
+        switch (functionName) {
+          case 'erc20':
             balances = await this.portfolioService.getWalletErc20Balances(
               decodeAddress(encodedAddress),
             );
             break;
-          case PORTFOLIO_CALLBACK_DATA_PREFIXS.NFT:
+          case 'nft':
             balances = await this.portfolioService.getWalletNftBalances(
               decodeAddress(encodedAddress),
             );
@@ -602,6 +643,16 @@ export class BotService {
           wallet.index,
           balances,
           combinedPrefix,
+        );
+        return;
+      }
+
+      if (
+        data.startsWith(BULK_TRANSFER_CALLBACK_DATA_PREFIXS.ADD_NEW_SECTION)
+      ) {
+        await this.walletService.handleAddSectionBulkTransfer(
+          this.bot,
+          callbackQuery,
         );
         return;
       }
@@ -680,6 +731,27 @@ export class BotService {
         }
       }
 
+      if (
+        data.startsWith(BULK_TRANSFER_CALLBACK_DATA_PREFIXS.FINISH_ADD_SECTION)
+      ) {
+        const state = await this.redisService.get(
+          `user:${callbackQuery.message.chat.id}:state`,
+        );
+
+        const stringifiedContext = state.replace(
+          UserState.AwaittingNextActionBulkTransfer + '_',
+          '',
+        );
+
+        await this.requirePassword(
+          callbackQuery.message,
+          UserState.AwaitingInvokeTransaction +
+            '_' +
+            FUNCTIONS_CALLBACK_DATA_PREFIXS.TRANSFER +
+            stringifiedContext,
+        );
+      }
+
       if (data === CONFIRM_TRANSACTION_CALLBACK_DATA_PREFIXS) {
         const data = await this.redisService.get(
           `user:${callbackQuery.message.chat.id}:state`,
@@ -697,23 +769,11 @@ export class BotService {
         // );
         try {
           sendAwaitForInvolkTransactionMessage(this.bot, callbackQuery.message);
-
-          const transferDetail = JSON.parse(stringifiedTransferDetail);
-          if (
-            transferDetail.contractDetail.standard === ContractStandard.ERC20
-          ) {
-            await this.walletService.handleTransferErc20(
-              this.bot,
-              callbackQuery.message,
-              stringifiedTransferDetail,
-            );
-          } else {
-            await this.walletService.handleTransferNft(
-              this.bot,
-              callbackQuery.message,
-              stringifiedTransferDetail,
-            );
-          }
+          await this.walletService.handleExecuteTransaction(
+            this.bot,
+            callbackQuery.message,
+            stringifiedTransferDetail,
+          );
         } catch (error) {
           console.log(error);
 
@@ -939,7 +999,7 @@ export class BotService {
     const newUserDocument = await this.userModel.findOneAndUpdate(
       { chatId: msg.chat.id },
       { $set: newUser },
-      { upsert: true },
+      { upsert: true, new: true },
     );
 
     // create new parrent wallet
@@ -1053,10 +1113,36 @@ export class BotService {
       address: contractAddress,
     });
 
+    const state = await this.redisService.get(`user:${msg.chat.id}:state`);
+
+    let isBulkTransfer = false;
+    let sectionDetail = [];
+    let currentIndex = 0;
+    if (state) {
+      if (state.startsWith(UserState.AwaitingNewBulkTransfer)) {
+        isBulkTransfer = true;
+      }
+
+      if (state.startsWith(UserState.AwaittingAddNewSectionBulkTransfer)) {
+        const stringifiedContext = state.replace(
+          UserState.AwaittingAddNewSectionBulkTransfer + '_',
+          '',
+        );
+        isBulkTransfer = true;
+
+        const context = JSON.parse(stringifiedContext);
+        sectionDetail = context.sectionDetail;
+        currentIndex = context.currentIndex;
+      }
+    }
+    sectionDetail.push({ contractDetail });
+
     const transferDetail = {
       userDocument,
       wallet,
-      contractDetail,
+      isBulkTransfer,
+      currentIndex,
+      sectionDetail,
     };
 
     const combinedValue =
@@ -1080,11 +1166,37 @@ export class BotService {
       address: contractAddress,
     });
 
+    let isBulkTransfer = false;
+    let sectionDetail = [];
+    let currentIndex = 0;
+    const state = await this.redisService.get(`user:${msg.chat.id}:state`);
+    if (state) {
+      if (state.startsWith(UserState.AwaitingNewBulkTransfer)) {
+        isBulkTransfer = true;
+      }
+
+      if (state.startsWith(UserState.AwaittingAddNewSectionBulkTransfer)) {
+        const stringifiedContext = state.replace(
+          UserState.AwaittingAddNewSectionBulkTransfer + '_',
+          '',
+        );
+
+        isBulkTransfer = true;
+
+        const context = JSON.parse(stringifiedContext);
+        sectionDetail = context.sectionDetail;
+        currentIndex = context.currentIndex;
+      }
+    }
+
+    sectionDetail.push({ contractDetail, tokenId });
+
     const transferDetail = {
       userDocument,
       wallet,
-      contractDetail,
-      tokenId,
+      isBulkTransfer,
+      currentIndex,
+      sectionDetail,
     };
 
     const combinedValue =
@@ -1102,7 +1214,8 @@ export class BotService {
     sendRequireErc20AmountMessage(this.bot, msg);
 
     const transferDetail = JSON.parse(context);
-    transferDetail.receiver = formattedContractAddress(receiver);
+    transferDetail.sectionDetail[transferDetail.currentIndex].receiver =
+      formattedContractAddress(receiver);
 
     const combinedValue =
       UserState.AwaitingRequireErc20Amount +
@@ -1128,7 +1241,13 @@ export class BotService {
   ) {
     const transferDetail = JSON.parse(context);
     const password = msg.text;
-    const { wallet, contractDetail, userDocument, receiver } = transferDetail;
+    const {
+      wallet,
+      sectionDetail,
+      userDocument,
+      isBulkTransfer,
+      currentIndex,
+    } = transferDetail;
 
     const { seedPhrase: encryptedSeedPhrase, iv, salt } = userDocument;
     const seedPhrase = await decryptWithPBEAndSecret(
@@ -1146,86 +1265,12 @@ export class BotService {
       chainDocument.rpc,
     );
 
-    let estimatedFee: EstimateFee;
-    try {
-      switch (contractDetail.standard) {
-        case ContractStandard.ERC20:
-          estimatedFee = await account.estimateFee([
-            {
-              contractAddress: contractDetail.address,
-              entrypoint: 'transfer',
-              calldata: CallData.compile({
-                recipient: receiver,
-                amount: uint256.bnToUint256('1'),
-              }),
-            },
-          ]);
-          break;
-        case ContractStandard.ERC721:
-          try {
-            estimatedFee = await account.estimateFee([
-              {
-                contractAddress: contractDetail.address,
-                entrypoint: 'transferFrom',
-                calldata: CallData.compile({
-                  from: wallet.address,
-                  to: receiver,
-                  tokenId: uint256.bnToUint256(transferDetail.tokenId),
-                }),
-              },
-            ]);
-          } catch (error) {
-            estimatedFee = await account.estimateFee([
-              {
-                contractAddress: contractDetail.address,
-                entrypoint: 'transfer_from',
-                calldata: CallData.compile({
-                  from: wallet.address,
-                  to: receiver,
-                  tokenId: uint256.bnToUint256(transferDetail.tokenId),
-                }),
-              },
-            ]);
-          }
-          break;
-        case ContractStandard.ERC1155:
-          try {
-            estimatedFee = await account.estimateFee([
-              {
-                contractAddress: contractDetail.address,
-                entrypoint: 'safeTransferFrom',
-                calldata: CallData.compile({
-                  from: wallet.address,
-                  to: receiver,
-                  id: uint256.bnToUint256(transferDetail.tokenId),
-                  amount: uint256.bnToUint256(transferDetail.amount),
-                  data: [],
-                }),
-              },
-            ]);
-          } catch (error) {
-            estimatedFee = await account.estimateFee([
-              {
-                contractAddress: contractDetail.address,
-                entrypoint: 'safe_transfer_from',
-                calldata: CallData.compile({
-                  from: wallet.address,
-                  to: receiver,
-                  id: uint256.bnToUint256(transferDetail.tokenId),
-                  amount: uint256.bnToUint256(transferDetail.amount),
-                  data: [],
-                }),
-              },
-            ]);
-          }
-          break;
-      }
-    } catch (error) {
-      console.log(error);
-
-      sendErrorMessage(this.bot, msg);
-      return;
-    }
+    const estimatedFee = await this.estimateTransactionFee(
+      msg,
+      context,
+      account,
+    );
+    if (!estimatedFee) return;
 
     const ethBalance = await this.portfolioService.getWalletErc20Balance(
       wallet.address,
@@ -1257,6 +1302,183 @@ export class BotService {
       '_' +
       JSON.stringify(transferDetail);
     await this.redisService.set(`user:${msg.chat.id}:state`, combinedValue);
+  }
+
+  private async estimateTransactionFee(
+    msg: TelegramBot.Message,
+    context: string,
+    account: Account,
+  ): Promise<EstimateFee> {
+    const transferDetail = JSON.parse(context);
+    const { wallet, sectionDetail, isBulkTransfer } = transferDetail;
+
+    let estimatedFee: EstimateFee;
+
+    try {
+      if (!isBulkTransfer) {
+        const { contractDetail, receiver, tokenId, amount } = sectionDetail[0];
+
+        switch (contractDetail.standard) {
+          case ContractStandard.ERC20:
+            estimatedFee = await account.estimateFee([
+              {
+                contractAddress: contractDetail.address,
+                entrypoint: 'transfer',
+                calldata: CallData.compile({
+                  recipient: receiver,
+                  amount: uint256.bnToUint256('1'),
+                }),
+              },
+            ]);
+            break;
+          case ContractStandard.ERC721:
+            try {
+              estimatedFee = await account.estimateFee([
+                {
+                  contractAddress: contractDetail.address,
+                  entrypoint: 'transferFrom',
+                  calldata: CallData.compile({
+                    from: wallet.address,
+                    to: receiver,
+                    tokenId: uint256.bnToUint256(tokenId),
+                  }),
+                },
+              ]);
+            } catch (error) {
+              estimatedFee = await account.estimateFee([
+                {
+                  contractAddress: contractDetail.address,
+                  entrypoint: 'transfer_from',
+                  calldata: CallData.compile({
+                    from: wallet.address,
+                    to: receiver,
+                    tokenId: uint256.bnToUint256(tokenId),
+                  }),
+                },
+              ]);
+            }
+            break;
+          case ContractStandard.ERC1155:
+            try {
+              estimatedFee = await account.estimateFee([
+                {
+                  contractAddress: contractDetail.address,
+                  entrypoint: 'safeTransferFrom',
+                  calldata: CallData.compile({
+                    from: wallet.address,
+                    to: receiver,
+                    id: uint256.bnToUint256(tokenId),
+                    amount: uint256.bnToUint256(amount),
+                    data: [],
+                  }),
+                },
+              ]);
+            } catch (error) {
+              estimatedFee = await account.estimateFee([
+                {
+                  contractAddress: contractDetail.address,
+                  entrypoint: 'safe_transfer_from',
+                  calldata: CallData.compile({
+                    from: wallet.address,
+                    to: receiver,
+                    id: uint256.bnToUint256(tokenId),
+                    amount: uint256.bnToUint256(amount),
+                    data: [],
+                  }),
+                },
+              ]);
+            }
+            break;
+        }
+      } else {
+        const multiCallData = [];
+        const multiCallCamelCaseData = [];
+        for (const section of sectionDetail) {
+          const { contractDetail, receiver, tokenId, amount } = section;
+          switch (contractDetail.standard) {
+            case ContractStandard.ERC20:
+              multiCallData.push({
+                contractAddress: contractDetail.address,
+                entrypoint: 'transfer',
+                calldata: CallData.compile({
+                  recipient: receiver,
+                  amount: uint256.bnToUint256(
+                    parseUnits(amount, contractDetail.decimals),
+                  ),
+                }),
+              });
+              multiCallCamelCaseData.push({
+                contractAddress: contractDetail.address,
+                entrypoint: 'transfer',
+                calldata: CallData.compile({
+                  recipient: receiver,
+                  amount: uint256.bnToUint256(
+                    parseUnits(amount, contractDetail.decimals),
+                  ),
+                }),
+              });
+              break;
+            case ContractStandard.ERC721:
+              multiCallData.push({
+                contractAddress: contractDetail.address,
+                entrypoint: 'transfer_from',
+                calldata: CallData.compile({
+                  from: wallet.address,
+                  to: receiver,
+                  tokenId: uint256.bnToUint256(tokenId),
+                }),
+              });
+              multiCallCamelCaseData.push({
+                contractAddress: contractDetail.address,
+                entrypoint: 'transferFrom',
+                calldata: CallData.compile({
+                  from: wallet.address,
+                  to: receiver,
+                  tokenId: uint256.bnToUint256(tokenId),
+                }),
+              });
+              break;
+            case ContractStandard.ERC1155:
+              multiCallData.push({
+                contractAddress: contractDetail.address,
+                entrypoint: 'safe_transfer_from',
+                calldata: CallData.compile({
+                  from: wallet.address,
+                  to: receiver,
+                  id: uint256.bnToUint256(tokenId),
+                  amount: uint256.bnToUint256(amount),
+                  data: [],
+                }),
+              });
+              multiCallCamelCaseData.push({
+                contractAddress: contractDetail.address,
+                entrypoint: 'safeTransferFrom',
+                calldata: CallData.compile({
+                  from: wallet.address,
+                  to: receiver,
+                  id: uint256.bnToUint256(tokenId),
+                  amount: uint256.bnToUint256(amount),
+                  data: [],
+                }),
+              });
+              break;
+          }
+        }
+
+        try {
+          estimatedFee = await account.estimateFee(multiCallData);
+        } catch (error) {
+          estimatedFee = await account.estimateFee(multiCallCamelCaseData);
+        }
+      }
+    } catch (error) {
+      console.log(error);
+
+      sendErrorMessage(this.bot, msg);
+      return;
+    }
+
+    return estimatedFee;
   }
 
   private async handleInvokeTransactionCommand(
