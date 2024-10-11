@@ -35,7 +35,6 @@ import {
 } from '@app/shared/models';
 import { formattedContractAddress } from '@app/shared/utils';
 import TelegramBot from 'node-telegram-bot-api';
-import configuration from '@app/shared/configuration';
 import {
   sendErc20BurnedMessage,
   sendErc20MintedMessage,
@@ -44,10 +43,11 @@ import {
   sendNftMintedMessage,
   sendNftTransferedMessage,
 } from '@app/shared/messages';
+import configuration from '@app/shared/configuration';
 
 @Injectable()
 export class DetectionSerivce {
-  private bot: TelegramBot;
+  private bot: TelegramBot = configuration().BOT;
 
   constructor(
     @InjectModel(ContractDetails.name)
@@ -65,11 +65,7 @@ export class DetectionSerivce {
     @InjectQueue(QUEUE_METADATA)
     private readonly fetchMetadataQueue: Queue<string>,
     private readonly web3Service: Web3Service,
-  ) {
-    this.bot = new TelegramBot(configuration().TELEGRAM_BOT_TOKEN, {
-      polling: true,
-    });
-  }
+  ) {}
 
   logger = new Logger(DetectionSerivce.name);
 

@@ -15,6 +15,8 @@ services:
     volumes:
       - ./redis.conf:/usr/local/etc/redis/redis.conf
     command: redis-server /usr/local/etc/redis/redis.conf
+    environment:
+      - HOST=redis
     networks:
       - app-network
     restart: always
@@ -46,12 +48,111 @@ services:
     secrets:
       - telegram_bot_token
       - db_path
+      - encrypt_secret_key
+      - phrase_to_pk_pwd
+      - ipfs_gateway
+      - redis_port
+      - redis_host
+      - redis_password
+      - begin_block
+      - bot_service_port
+      - onchain_worker_port
+      - onchain_queue_port
+      - offchain_worker_port
     restart: always
     depends_on:
       - mongo
       - redis
-    ports:
-      - '5001:5001'
+    user: '1000:1000'
+
+  onchain-worker:
+    container_name: onchain-worker
+    build:
+      context: .
+      args:
+        PKG: 'onchain-worker'
+      dockerfile: Dockerfile
+
+    networks:
+      - app-network
+    secrets:
+      - telegram_bot_token
+      - db_path
+      - encrypt_secret_key
+      - phrase_to_pk_pwd
+      - ipfs_gateway
+      - redis_port
+      - redis_host
+      - redis_password
+      - begin_block
+      - bot_service_port
+      - onchain_worker_port
+      - onchain_queue_port
+      - offchain_worker_port
+    restart: always
+    depends_on:
+      - mongo
+      - redis
+    user: '1000:1000'
+
+  onchain-queue:
+    container_name: onchain-queue
+    build:
+      context: .
+      args:
+        PKG: 'onchain-queue'
+      dockerfile: Dockerfile
+
+    networks:
+      - app-network
+    secrets:
+      - telegram_bot_token
+      - db_path
+      - encrypt_secret_key
+      - phrase_to_pk_pwd
+      - ipfs_gateway
+      - redis_port
+      - redis_host
+      - redis_password
+      - begin_block
+      - bot_service_port
+      - onchain_worker_port
+      - onchain_queue_port
+      - offchain_worker_port
+    restart: always
+    depends_on:
+      - mongo
+      - redis
+    user: '1000:1000'
+
+  offchain-worker:
+    container_name: offchain-worker
+    build:
+      context: .
+      args:
+        PKG: 'offchain-worker'
+      dockerfile: Dockerfile
+
+    networks:
+      - app-network
+    secrets:
+      - telegram_bot_token
+      - db_path
+      - encrypt_secret_key
+      - phrase_to_pk_pwd
+      - ipfs_gateway
+      - redis_port
+      - redis_host
+      - redis_password
+      - begin_block
+      - bot_service_port
+      - onchain_worker_port
+      - onchain_queue_port
+      - offchain_worker_port
+    restart: always
+    depends_on:
+      - mongo
+      - redis
     user: '1000:1000'
 
 secrets:
@@ -59,3 +160,25 @@ secrets:
     file: ./secrets/TELEGRAM_BOT_TOKEN.txt
   db_path:
     file: ./secrets/DB_PATH.txt
+  encrypt_secret_key:
+    file: ./secrets/ENCRYPT_SECRET_KEY.txt
+  phrase_to_pk_pwd:
+    file: ./secrets/PHRASE_TO_PK_PWD.txt
+  ipfs_gateway:
+    file: ./secrets/IPFS_GATEWAY.txt
+  redis_port:
+    file: ./secrets/redis/PORT.txt
+  redis_host:
+    file: ./secrets/redis/HOST.txt
+  redis_password:
+    file: ./secrets/redis/PASSWORD.txt
+  begin_block:
+    file: ./secrets/BEGIN_BLOCK.txt
+  bot_service_port:
+    file: ./secrets/ports/BOT_SERVICE.txt
+  onchain_worker_port:
+    file: ./secrets/ports/ONCHAIN_WORKER.txt
+  onchain_queue_port:
+    file: ./secrets/ports/ONCHAIN_QUEUE.txt
+  offchain_worker_port:
+    file: ./secrets/ports/OFFCHAIN_WORKER.txt

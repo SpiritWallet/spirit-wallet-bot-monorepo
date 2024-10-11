@@ -97,7 +97,7 @@ import { CallData, uint256, EstimateFee, Account } from 'starknet';
 
 @Injectable()
 export class BotService {
-  private bot: TelegramBot;
+  private bot: TelegramBot = configuration().BOT;
 
   constructor(
     @InjectModel(Users.name) private readonly userModel: Model<UserDocument>,
@@ -113,9 +113,7 @@ export class BotService {
     private readonly walletService: WalletService,
     private readonly web3Service: Web3Service,
   ) {
-    this.bot = new TelegramBot(configuration().TELEGRAM_BOT_TOKEN, {
-      polling: true,
-    });
+    this.bot.startPolling({ restart: true });
     this.listenOnMessage();
   }
 
