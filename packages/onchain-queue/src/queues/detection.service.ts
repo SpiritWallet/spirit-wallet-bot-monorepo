@@ -221,8 +221,6 @@ export class DetectionSerivce {
 
     const fromWallet = await this.walletModel.findOne({ address: from });
     const toWallet = await this.walletModel.findOne({ address: to });
-    console.log(fromWallet, toWallet);
-
     if (!fromWallet && !toWallet) return;
 
     const contractDetail = await this.getOrCreateContractDetail(
