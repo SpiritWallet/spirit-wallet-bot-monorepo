@@ -27,6 +27,7 @@ services:
     image: redis:7.4.0-alpine3.20
     volumes:
       - ./redis.conf:/usr/local/etc/redis/redis.conf
+      - ./redis_data:/data
     command: redis-server /usr/local/etc/redis/redis.conf
     environment:
       - HOST=redis
