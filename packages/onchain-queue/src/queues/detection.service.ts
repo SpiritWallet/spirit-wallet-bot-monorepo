@@ -44,6 +44,7 @@ import {
   sendNftTransferedMessage,
 } from '@app/shared/messages';
 import configuration from '@app/shared/configuration';
+import { SEQUENCER_ADDRESS } from '@app/shared/constants';
 
 @Injectable()
 export class DetectionSerivce {
@@ -459,17 +460,19 @@ export class DetectionSerivce {
         });
       }
 
-      sendErc20TransferedMessage(
-        this.bot,
-        fromWallet.chatId.chatId,
-        from,
-        false,
-        to,
-        contractDetail.symbol,
-        value,
-        contractDetail.decimals,
-        log.transaction_hash,
-      );
+      if (to !== SEQUENCER_ADDRESS) {
+        sendErc20TransferedMessage(
+          this.bot,
+          fromWallet.chatId.chatId,
+          from,
+          false,
+          to,
+          contractDetail.symbol,
+          value,
+          contractDetail.decimals,
+          log.transaction_hash,
+        );
+      }
     }
 
     if (toWallet) {
