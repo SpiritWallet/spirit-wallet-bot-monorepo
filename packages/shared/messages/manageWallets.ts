@@ -350,7 +350,7 @@ export function sendAlreadyDeployedWalletMessage(
   txHash: string,
   encodedAddress: string,
 ) {
-  const message = `You already have a deployed wallet!\n\nHere is your transaction hash: [${txHash}](https://sepolia.starkscan.co/tx/${txHash}).`;
+  const message = `You already have a deployed wallet!\n\nHere is your transaction hash: [${txHash}](https://starkscan.co/tx/${txHash}).`;
 
   bot.sendMessage(msg.chat.id, message, {
     parse_mode: 'Markdown',
@@ -376,7 +376,7 @@ export function sendDeployWalletSuccessMessage(
   txHash: string,
   encodeAddress: string,
 ) {
-  const message = `Your wallet has been successfully deployed!\n\nHere is your transaction hash: [${txHash}](https://sepolia.starkscan.co/tx/${txHash}).`;
+  const message = `Your wallet has been successfully deployed!\n\nHere is your transaction hash: [${txHash}](https://starkscan.co/tx/${txHash}).`;
   bot.sendMessage(msg.chat.id, message, {
     parse_mode: 'Markdown',
     reply_markup: {
@@ -391,6 +391,7 @@ export function sendDeployWalletSuccessMessage(
         ],
       ],
     },
+    disable_web_page_preview: true,
   });
 }
 
@@ -400,7 +401,7 @@ export function sendInvolkeTransactionSuccessMessage(
   txHash: string,
   encodedAddress: string,
 ) {
-  const message = `Your transaction has been successfully invoked!\n\nHere is your transaction hash: [${txHash}](https://sepolia.starkscan.co/tx/${txHash}).`;
+  const message = `Your transaction has been successfully invoked!\n\nHere is your transaction hash: [${txHash}](https://starkscan.co/tx/${txHash}).`;
 
   bot.sendMessage(msg.chat.id, message, {
     parse_mode: 'Markdown',

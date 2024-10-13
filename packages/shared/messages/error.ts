@@ -53,7 +53,7 @@ export function sendDeployWalletFailedErrorMessage(
   transactionHash: string,
   encodedAddress: string,
 ) {
-  const message = `Oops! Deploying your wallet failed. Please try again later.\n\nHere is your transaction hash: [${transactionHash}](https://sepolia.starkscan.co/tx/${transactionHash}).`;
+  const message = `Oops! Deploying your wallet failed. Please try again later.\n\nHere is your transaction hash: [${transactionHash}](https://starkscan.co/tx/${transactionHash}).`;
 
   bot.sendMessage(msg.chat.id, message, {
     parse_mode: 'Markdown',
@@ -79,7 +79,7 @@ export function sendInvolkeTransactionFailedErrorMessage(
   transactionHash: string,
   encodedAddress: string,
 ) {
-  const message = `Oops! Involke transaction failed. Please try again later.\n\nHere is your transaction hash: [${transactionHash}](https://sepolia.starkscan.co/tx/${transactionHash}).`;
+  const message = `Oops! Involke transaction failed. Please try again later.\n\nHere is your transaction hash: [${transactionHash}](https://starkscan.co/tx/${transactionHash}).`;
 
   bot.sendMessage(msg.chat.id, message, {
     parse_mode: 'Markdown',
