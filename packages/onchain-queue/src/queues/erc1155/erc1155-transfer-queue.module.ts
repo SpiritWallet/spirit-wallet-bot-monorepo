@@ -25,6 +25,8 @@ import {
   Erc20BalanceSchema,
   NftDetails,
   NftDetailSchema,
+  UserSchema,
+  Users,
 } from '@app/shared/models';
 import { ERC1155TransferProcessor } from './processors';
 
@@ -38,6 +40,7 @@ import { ERC1155TransferProcessor } from './processors';
       { name: NftBalances.name, schema: NftBalanceSchema },
       { name: NftDetails.name, schema: NftDetailSchema },
       { name: Erc20Balances.name, schema: Erc20BalanceSchema },
+      { name: Users.name, schema: UserSchema },
     ]),
     BullModule.registerQueue(
       {

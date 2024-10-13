@@ -26,6 +26,8 @@ import {
   Erc20Balances,
   NftDetailSchema,
   NftDetails,
+  UserSchema,
+  Users,
 } from '@app/shared/models';
 
 @Module({
@@ -38,6 +40,7 @@ import {
       { name: NftBalances.name, schema: NftBalanceSchema },
       { name: NftDetails.name, schema: NftDetailSchema },
       { name: Erc20Balances.name, schema: Erc20BalanceSchema },
+      { name: Users.name, schema: UserSchema },
     ]),
     BullModule.registerQueue(
       {

@@ -13,6 +13,11 @@ import {
   Erc721MintQueueModule,
   Erc721TransferQueueModule,
 } from './queues';
+import {
+  Erc20BurnQueueModule,
+  Erc20MintQueueModule,
+  Erc20TransferQueueModule,
+} from './queues/erc20';
 
 @Module({
   imports: [
@@ -29,6 +34,9 @@ import {
       },
     }),
 
+    Erc20BurnQueueModule,
+    Erc20MintQueueModule,
+    Erc20TransferQueueModule,
     Erc721BurnQueueModule,
     Erc721MintQueueModule,
     Erc721TransferQueueModule,

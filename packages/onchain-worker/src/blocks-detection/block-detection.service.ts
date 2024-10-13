@@ -301,6 +301,12 @@ export class BlockDetectionService extends OnchainWorker {
         }
 
         if (queue && jobName) {
+          if (
+            txHash ===
+            '0x6fc3cbe1fb591b4ba9dcf3a7e394791a0ae37dceca219f1e58fc832b1571791'
+          ) {
+            console.log(eventWithType);
+          }
           await this.onchainQueue.add(queue, jobName, event);
         }
         index++;
