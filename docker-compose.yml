@@ -10,6 +10,19 @@ networks:
     driver: bridge
 
 services:
+  juno:
+    image: nethermind/juno
+    ports:
+      - '6060:6060' # Map host port 6060 to container port 6060
+    volumes:
+      - $HOME/snapshots/juno_mainnet:/var/lib/juno # Mount local directory to container
+    networks:
+      - app-network
+    command: --http --http-port 6060 --http-host 0.0.0.0 --db-path /var/lib/juno --eth-node <YOUR-ETH-NODE> # Replace <YOUR-ETH-NODE> with actual node
+    environment:
+      - HOST=node
+    restart: always
+
   redis:
     image: redis:7.4.0-alpine3.20
     volumes:
@@ -20,6 +33,8 @@ services:
     networks:
       - app-network
     restart: always
+    ports:
+      - 127.0.0.1:6380:6379
     user: '1000:1000'
 
   mongo:
@@ -63,6 +78,7 @@ services:
     depends_on:
       - mongo
       - redis
+      - juno
     user: '1000:1000'
 
   onchain-worker:
@@ -72,7 +88,6 @@ services:
       args:
         PKG: 'onchain-worker'
       dockerfile: Dockerfile
-
     networks:
       - app-network
     secrets:
@@ -93,6 +108,7 @@ services:
     depends_on:
       - mongo
       - redis
+      - juno
     user: '1000:1000'
 
   onchain-queue:
@@ -123,6 +139,7 @@ services:
     depends_on:
       - mongo
       - redis
+      - juno
     user: '1000:1000'
 
   offchain-worker:
@@ -153,6 +170,7 @@ services:
     depends_on:
       - mongo
       - redis
+      - juno
     user: '1000:1000'
 
 secrets:
