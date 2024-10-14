@@ -36,7 +36,7 @@ import {
   sendConfirmTransactionMessage,
   sendNotDeployedWalletMessage,
   sendInvalidAmountMessage,
-  sendAwaitForInvolkTransactionMessage,
+  editIntoAwaitForInvolkTransactionMessage,
   sendNftDetailMessage,
   sendRequireNftReceiverMessage,
   sendInsufficientBalanceErrorMessage,
@@ -771,7 +771,10 @@ export class BotService {
         //   `user:${callbackQuery.message.chat.id}:state`,
         // );
         try {
-          sendAwaitForInvolkTransactionMessage(this.bot, callbackQuery.message);
+          editIntoAwaitForInvolkTransactionMessage(
+            this.bot,
+            callbackQuery.message,
+          );
           await this.walletService.handleExecuteTransaction(
             this.bot,
             callbackQuery.message,

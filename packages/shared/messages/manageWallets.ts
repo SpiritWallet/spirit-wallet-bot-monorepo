@@ -452,6 +452,17 @@ export function sendAwaitForInvolkTransactionMessage(
 ) {
   const message = `Please wait for your transaction to be invoked.`;
 
+  bot.sendMessage(msg.chat.id, message, {
+    parse_mode: 'Markdown',
+  });
+}
+
+export function editIntoAwaitForInvolkTransactionMessage(
+  bot: TelegramBot,
+  msg: TelegramBot.Message,
+) {
+  const message = `Please wait for your transaction to be invoked.`;
+
   bot.editMessageText(message, {
     chat_id: msg.chat.id,
     message_id: msg.message_id,
