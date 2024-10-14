@@ -44,7 +44,10 @@ import {
   sendNftTransferedMessage,
 } from '@app/shared/messages';
 import configuration from '@app/shared/configuration';
-import { SEQUENCER_ADDRESS } from '@app/shared/constants';
+import {
+  COMMON_CONTRACT_ADDRESS,
+  SEQUENCER_ADDRESS,
+} from '@app/shared/constants';
 
 @Injectable()
 export class DetectionSerivce {
@@ -456,7 +459,10 @@ export class DetectionSerivce {
           { $set: newErc20Balance },
           { new: true, upsert: true },
         );
-      } else {
+      } else if (
+        contractAddress !== COMMON_CONTRACT_ADDRESS.ETH &&
+        contractAddress !== COMMON_CONTRACT_ADDRESS.STRK
+      ) {
         await this.erc20BalanceModel.deleteOne({
           contractAddress,
           wallet: fromWallet._id,
@@ -501,7 +507,10 @@ export class DetectionSerivce {
           { $set: newErc20Balance },
           { new: true, upsert: true },
         );
-      } else {
+      } else if (
+        contractAddress !== COMMON_CONTRACT_ADDRESS.ETH &&
+        contractAddress !== COMMON_CONTRACT_ADDRESS.STRK
+      ) {
         await this.erc20BalanceModel.deleteOne({
           contractAddress,
           wallet: toWallet._id,

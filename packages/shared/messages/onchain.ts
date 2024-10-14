@@ -1,8 +1,24 @@
 // SPDX-License-Identifier: MIT
 
-import { shortenAddress } from '../utils';
+import { decodeAddress, shortenAddress } from '../utils';
 import { formatUnits } from 'ethers';
 import TelegramBot from 'node-telegram-bot-api';
+import { TURN_BACK_CALLBACK_DATA_KEYS } from '../constants';
+
+export function inlineBackToWalletFunctionCallBackData(encodedAddress: string) {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: 'Back to wallet functions',
+          callback_data:
+            TURN_BACK_CALLBACK_DATA_KEYS.BACK_TO_WALLET_FUNCTIONS +
+            encodedAddress,
+        },
+      ],
+    ],
+  };
+}
 
 export async function sendErc20MintedMessage(
   bot: TelegramBot,
@@ -16,6 +32,9 @@ export async function sendErc20MintedMessage(
   const message = `Your wallet ${'`'}${walletAddress}${'`'} minted ${formatUnits(value, decimals)} $${contractSymbol}\n\n Transaction hash: [${shortenAddress(txHash)}](https://starkscan.co/tx/${txHash}).`;
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
+    reply_markup: inlineBackToWalletFunctionCallBackData(
+      decodeAddress(walletAddress),
+    ),
     disable_web_page_preview: true,
   });
 }
@@ -32,6 +51,9 @@ export async function sendErc20BurnedMessage(
   const message = `Your wallet ${'`'}${walletAddress}${'`'} burned ${formatUnits(value, decimals)} $${contractSymbol}\n\n Transaction hash: [${shortenAddress(txHash)}](https://starkscan.co/tx/${txHash}).`;
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
+    reply_markup: inlineBackToWalletFunctionCallBackData(
+      decodeAddress(walletAddress),
+    ),
     disable_web_page_preview: true,
   });
 }
@@ -50,6 +72,9 @@ export async function sendErc20TransferedMessage(
   const message = `Your wallet ${'`'}${walletAddress}${'`'} ${isReceiver ? 'received' : 'sent'} ${formatUnits(value, decimals)} $${contractSymbol} ${isReceiver ? 'from' : 'to'} ${'`'}${otherWalletAddress}${'`'}.\n\n Transaction hash: [${shortenAddress(txHash)}](https://starkscan.co/tx/${txHash}).`;
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
+    reply_markup: inlineBackToWalletFunctionCallBackData(
+      decodeAddress(walletAddress),
+    ),
     disable_web_page_preview: true,
   });
 }
@@ -66,6 +91,9 @@ export async function sendNftMintedMessage(
   const message = `Your wallet ${'`'}${walletAddress}${'`'} minted ${amount} NFT #${contractSymbol} with #tokenId ${tokenId}\n\n Transaction hash: [${shortenAddress(txHash)}](https://starkscan.co/tx/${txHash}).`;
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
+    reply_markup: inlineBackToWalletFunctionCallBackData(
+      decodeAddress(walletAddress),
+    ),
     disable_web_page_preview: true,
   });
 }
@@ -82,6 +110,9 @@ export async function sendNftBurnedMessage(
   const message = `Your wallet ${'`'}${walletAddress}${'`'} burned ${amount} NFT #${contractSymbol} with #tokenId ${tokenId}\n\n Transaction hash: [${shortenAddress(txHash)}](https://starkscan.co/tx/${txHash}).`;
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
+    reply_markup: inlineBackToWalletFunctionCallBackData(
+      decodeAddress(walletAddress),
+    ),
     disable_web_page_preview: true,
   });
 }
@@ -100,6 +131,9 @@ export async function sendNftTransferedMessage(
   const message = `Your wallet ${'`'}${walletAddress}${'`'} ${isReceiver ? 'received' : 'sent'} ${amount} NFT #${contractSymbol} with #tokenId ${tokenId} ${isReceiver ? 'from' : 'to'} ${'`'}${otherWalletAddress}${'`'}.\n\n Transaction hash: [${shortenAddress(txHash)}](https://starkscan.co/tx/${txHash}).`;
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
+    reply_markup: inlineBackToWalletFunctionCallBackData(
+      decodeAddress(walletAddress),
+    ),
     disable_web_page_preview: true,
   });
 }

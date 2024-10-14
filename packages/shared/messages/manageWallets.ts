@@ -452,7 +452,9 @@ export function sendAwaitForInvolkTransactionMessage(
 ) {
   const message = `Please wait for your transaction to be invoked.`;
 
-  bot.sendMessage(msg.chat.id, message, {
+  bot.editMessageText(message, {
+    chat_id: msg.chat.id,
+    message_id: msg.message_id,
     parse_mode: 'Markdown',
   });
 }
