@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-import { decodeAddress, shortenAddress } from '../utils';
+import { encodeAddress, shortenAddress } from '../utils';
 import { formatUnits } from 'ethers';
 import TelegramBot from 'node-telegram-bot-api';
 import { TURN_BACK_CALLBACK_DATA_KEYS } from '../constants';
@@ -33,7 +33,7 @@ export async function sendErc20MintedMessage(
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
     reply_markup: inlineBackToWalletFunctionCallBackData(
-      decodeAddress(walletAddress),
+      encodeAddress(walletAddress),
     ),
     disable_web_page_preview: true,
   });
@@ -52,7 +52,7 @@ export async function sendErc20BurnedMessage(
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
     reply_markup: inlineBackToWalletFunctionCallBackData(
-      decodeAddress(walletAddress),
+      encodeAddress(walletAddress),
     ),
     disable_web_page_preview: true,
   });
@@ -73,7 +73,7 @@ export async function sendErc20TransferedMessage(
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
     reply_markup: inlineBackToWalletFunctionCallBackData(
-      decodeAddress(walletAddress),
+      encodeAddress(walletAddress),
     ),
     disable_web_page_preview: true,
   });
@@ -92,7 +92,7 @@ export async function sendNftMintedMessage(
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
     reply_markup: inlineBackToWalletFunctionCallBackData(
-      decodeAddress(walletAddress),
+      encodeAddress(walletAddress),
     ),
     disable_web_page_preview: true,
   });
@@ -111,7 +111,7 @@ export async function sendNftBurnedMessage(
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
     reply_markup: inlineBackToWalletFunctionCallBackData(
-      decodeAddress(walletAddress),
+      encodeAddress(walletAddress),
     ),
     disable_web_page_preview: true,
   });
@@ -132,7 +132,7 @@ export async function sendNftTransferedMessage(
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
     reply_markup: inlineBackToWalletFunctionCallBackData(
-      decodeAddress(walletAddress),
+      encodeAddress(walletAddress),
     ),
     disable_web_page_preview: true,
   });
