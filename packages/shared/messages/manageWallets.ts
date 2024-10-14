@@ -350,7 +350,7 @@ export function sendAlreadyDeployedWalletMessage(
   txHash: string,
   encodedAddress: string,
 ) {
-  const message = `You already have a deployed wallet!\n\nHere is your transaction hash: [${txHash}](https://starkscan.co/tx/${txHash}).`;
+  const message = `Your wallet ${'`'}${decodeAddress(encodedAddress)}${'`'} have been deployed!\n\nHere is your transaction hash: [${txHash}](https://starkscan.co/tx/${txHash}).`;
 
   bot.sendMessage(msg.chat.id, message, {
     parse_mode: 'Markdown',

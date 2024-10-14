@@ -42,6 +42,7 @@ import {
   sendInsufficientBalanceErrorMessage,
   sendInsufficientNftBalanceErrorMessage,
   sendReviewBulkTransfer,
+  sendAboutMessage,
 } from '@app/shared/messages';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -133,6 +134,10 @@ export class BotService {
     // handle '/start' command
     this.bot.onText(/\/start/, (msg) => {
       sendStartMessage(this.bot, msg);
+    });
+
+    this.bot.onText(/\/about/, (msg) => {
+      sendAboutMessage(this.bot, msg);
     });
 
     // handle '/newwallet' command

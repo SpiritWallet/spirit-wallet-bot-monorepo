@@ -158,7 +158,10 @@ export class DetectionSerivce {
       { upsert: true, new: true },
     );
 
-    await this.fetchMetadataQueue.add(JOB_QUEUE_NFT_METADATA, nftDetail._id);
+    await this.fetchMetadataQueue.add(
+      JOB_QUEUE_NFT_METADATA,
+      nftDetailDocument._id,
+    );
     return nftDetailDocument;
   }
 
@@ -731,8 +734,12 @@ export class DetectionSerivce {
       timestamp,
     } = log.returnValues as ERC721OrERC20TransferReturnValue;
 
-    const fromWallet = await this.walletModel.findOne({ address: from });
-    const toWallet = await this.walletModel.findOne({ address: to });
+    const fromWallet = await this.walletModel
+      .findOne({ address: from })
+      .populate([{ path: 'chatId', select: ['chatId'] }]);
+    const toWallet = await this.walletModel
+      .findOne({ address: to })
+      .populate([{ path: 'chatId', select: ['chatId'] }]);
     if (!fromWallet && !toWallet) return;
 
     const contractDetail = await this.getOrCreateContractDetail(

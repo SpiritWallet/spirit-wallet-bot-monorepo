@@ -45,13 +45,13 @@ export const decodeERC721OrERC20Transfer = (
     return returnValue;
   } catch (error) {
     try {
-      const oldVercontractInstance = new Contract(
-        ABIS.OldErc721ABI,
+      const Erc721ContractInstance = new Contract(
+        ABIS.ERC721ABI,
         contractAddress,
         provider,
       );
-      txReceipt.events[0].keys = [EventTopic.TRANSFER];
-      const parsedEvent = oldVercontractInstance.parseEvents(txReceipt)[0];
+      txReceipt.events[0].keys.unshift(EventTopic.TRANSFER);
+      const parsedEvent = Erc721ContractInstance.parseEvents(txReceipt)[0];
       const returnValue: ERC721OrERC20TransferReturnValue = {
         from: formattedContractAddress(
           num.toHex(parsedEvent.Transfer.from as BigNumberish),
@@ -59,17 +59,40 @@ export const decodeERC721OrERC20Transfer = (
         to: formattedContractAddress(
           num.toHex(parsedEvent.Transfer.to as BigNumberish),
         ),
-        value: (
-          uint256.uint256ToBN(parsedEvent.Transfer.token_id as any) as bigint
-        ).toString(),
+        value: (parsedEvent.Transfer.token_id as bigint).toString(),
         contractAddress,
         timestamp,
         isKnownAsErc721: true,
       };
-
       return returnValue;
     } catch (error) {
-      return null;
+      try {
+        const oldVercontractInstance = new Contract(
+          ABIS.OldErc721ABI,
+          contractAddress,
+          provider,
+        );
+        txReceipt.events[0].keys.unshift(EventTopic.TRANSFER);
+        const parsedEvent = oldVercontractInstance.parseEvents(txReceipt)[0];
+        const returnValue: ERC721OrERC20TransferReturnValue = {
+          from: formattedContractAddress(
+            num.toHex(parsedEvent.Transfer.from as BigNumberish),
+          ),
+          to: formattedContractAddress(
+            num.toHex(parsedEvent.Transfer.to as BigNumberish),
+          ),
+          value: (
+            uint256.uint256ToBN(parsedEvent.Transfer.token_id as any) as bigint
+          ).toString(),
+          contractAddress,
+          timestamp,
+          isKnownAsErc721: true,
+        };
+
+        return returnValue;
+      } catch (error) {
+        return null;
+      }
     }
   }
 };
@@ -119,7 +142,7 @@ export const decodeERC115Transfer = (
         provider,
       );
 
-      txReceipt.events[0].keys = [EventTopic.TRANSFER_SINGLE];
+      txReceipt.events[0].keys.unshift(EventTopic.TRANSFER_SINGLE);
       const parsedEvent = contractInstance.parseEvents(txReceipt)[0];
       const returnValue: ERC1155TransferReturnValue = {
         from: formattedContractAddress(
@@ -180,7 +203,7 @@ export const decodeERC115TransferBatch = (
         provider,
       );
 
-      txReceipt.events[0].keys = [EventTopic.TRANSFER_BATCH];
+      txReceipt.events[0].keys.unshift(EventTopic.TRANSFER_BATCH);
       const parsedEvent = contractInstance.parseEvents(txReceipt)[0];
       const { from, to, ids, values } = parsedEvent.TransferBatch;
       const fromAddress = formattedContractAddress(

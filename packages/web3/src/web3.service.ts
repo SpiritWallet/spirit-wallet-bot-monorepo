@@ -29,6 +29,7 @@ import {
 } from './decodeEvent';
 import { ABIS } from './abi';
 import { attemptOperations, delay } from '@app/shared/utils/promise';
+import { SEQUENCER_ADDRESS } from '@app/shared/constants';
 
 @Injectable()
 export class Web3Service {
@@ -452,7 +453,10 @@ export class Web3Service {
                 ? EventType.BURN_721
                 : EventType.UNKNOWN_BURN;
             }
-            eventWithTypes.push(eventWithType);
+
+            if (returnValues.to !== SEQUENCER_ADDRESS) {
+              eventWithTypes.push(eventWithType);
+            }
           }
         } else if (event.keys.includes(EventTopic.TRANSFER_SINGLE)) {
           let returnValues: ERC1155TransferReturnValue = null;

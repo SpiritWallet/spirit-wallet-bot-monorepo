@@ -63,7 +63,7 @@ export async function sendNftMintedMessage(
   amount: string,
   txHash: string,
 ) {
-  const message = `Your wallet ${'`'}${walletAddress}${'`'} minted ${amount} NFT #${contractSymbol} with tokenId ${tokenId}\n\n Transaction hash: [${shortenAddress(txHash)}](https://starkscan.co/tx/${txHash}).`;
+  const message = `Your wallet ${'`'}${walletAddress}${'`'} minted ${amount} NFT #${contractSymbol} with #tokenId ${tokenId}\n\n Transaction hash: [${shortenAddress(txHash)}](https://starkscan.co/tx/${txHash}).`;
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
     disable_web_page_preview: true,
@@ -79,7 +79,7 @@ export async function sendNftBurnedMessage(
   amount: string,
   txHash: string,
 ) {
-  const message = `Your wallet ${'`'}${walletAddress}${'`'} burned ${amount} NFT #${contractSymbol} with tokenId ${tokenId}\n\n Transaction hash: [${shortenAddress(txHash)}](https://starkscan.co/tx/${txHash}).`;
+  const message = `Your wallet ${'`'}${walletAddress}${'`'} burned ${amount} NFT #${contractSymbol} with #tokenId ${tokenId}\n\n Transaction hash: [${shortenAddress(txHash)}](https://starkscan.co/tx/${txHash}).`;
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
     disable_web_page_preview: true,
@@ -97,7 +97,7 @@ export async function sendNftTransferedMessage(
   amount: string,
   txHash: string,
 ) {
-  const message = `Your wallet ${'`'}${walletAddress}${'`'} ${isReceiver ? 'received' : 'sent'} ${amount} NFT #${contractSymbol} with tokenId ${tokenId} ${isReceiver ? 'from' : 'to'} ${'`'}${otherWalletAddress}${'`'}.\n\n Transaction hash: [${shortenAddress(txHash)}](https://starkscan.co/tx/${txHash}).`;
+  const message = `Your wallet ${'`'}${walletAddress}${'`'} ${isReceiver ? 'received' : 'sent'} ${amount} NFT #${contractSymbol} with #tokenId ${tokenId} ${isReceiver ? 'from' : 'to'} ${'`'}${otherWalletAddress}${'`'}.\n\n Transaction hash: [${shortenAddress(txHash)}](https://starkscan.co/tx/${txHash}).`;
   bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
     disable_web_page_preview: true,

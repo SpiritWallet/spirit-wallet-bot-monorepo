@@ -8,6 +8,7 @@ import {
 } from '@app/shared/constants';
 import {
   sendAlreadyDeployedWalletMessage,
+  sendAwaitForInvolkTransactionMessage,
   sendDeployWalletFailedErrorMessage,
   sendDeployWalletSuccessMessage,
   sendInsufficientBalanceErrorMessage,
@@ -141,6 +142,7 @@ export class WalletService {
     }
 
     // deploy wallet
+    sendAwaitForInvolkTransactionMessage(bot, msg);
     const txHash = await this.web3Service.deployAccount(address, privateKey);
     const isSuccess = await this.web3Service.awaitTransaction(txHash);
 
@@ -315,12 +317,12 @@ export class WalletService {
       return null;
     }
 
-    sendInvolkeTransactionSuccessMessage(
-      bot,
-      msg,
-      txHash,
-      encodeAddress(wallet.address),
-    );
+    // sendInvolkeTransactionSuccessMessage(
+    //   bot,
+    //   msg,
+    //   txHash,
+    //   encodeAddress(wallet.address),
+    // );
 
     return txHash;
   }
